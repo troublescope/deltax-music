@@ -325,10 +325,11 @@ private fun rememberHomePagination(
             snapshotFlow {
                 val layout = listState.layoutInfo
                 val nearEnd =
-                    layout.visibleItemsInfo
-                        .lastOrNull()
-                        ?.index
-                        ?.let { it >= layout.totalItemsCount - 3 } == true
+                    layout.totalItemsCount <= 10 ||
+                        layout.visibleItemsInfo
+                            .lastOrNull()
+                            ?.index
+                            ?.let { it >= layout.totalItemsCount - 6 } == true
                 Triple(currentState, nearEnd, scrollRevision)
             }.collect { (state, nearEnd, revision) ->
                 if (trigger.shouldLoad(state, nearEnd, revision)) loadMore?.invoke()
@@ -393,11 +394,7 @@ fun LazyListScope.renderHomeShelves(
         shelf.chipTitle?.let { title ->
             item(key = "${shelf.key}_chip_header", contentType = "home_chip_header") {
                 Box(
-                    Modifier.fillMaxWidth().animateItem(
-                        fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-                        placementSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                        fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
-                    ),
+                    Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     Column(
@@ -421,11 +418,7 @@ fun LazyListScope.renderHomeShelves(
         if (shelf.style == HomeShelfStyle.SONG_LIST && !shelf.items.isVideoShelf()) {
             item(key = shelf.key, contentType = "home_list_header") {
                 Box(
-                    Modifier.fillMaxWidth().animateItem(
-                        fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-                        placementSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                        fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
-                    ),
+                    Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     Box(Modifier.widthIn(max = 1400.dp).fillMaxWidth()) {
@@ -451,11 +444,7 @@ fun LazyListScope.renderHomeShelves(
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .animateItem(
-                            fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-                            placementSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                            fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
-                        ).padding(bottom = if (index == shelf.items.lastIndex) 16.dp else 0.dp),
+                        .padding(bottom = if (index == shelf.items.lastIndex) 16.dp else 0.dp),
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     Box(Modifier.widthIn(max = 1400.dp).fillMaxWidth().padding(horizontal = if (isWide) 24.dp else 16.dp)) {
@@ -480,11 +469,7 @@ fun LazyListScope.renderHomeShelves(
             Box(
                 modifier =
                     Modifier
-                        .animateItem(
-                            fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-                            placementSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                            fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
-                        ).fillMaxWidth()
+                        .fillMaxWidth()
                         .padding(bottom = if (isWide) 24.dp else 16.dp),
                 contentAlignment = Alignment.TopCenter,
             ) {

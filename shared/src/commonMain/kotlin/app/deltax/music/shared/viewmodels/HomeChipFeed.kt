@@ -25,7 +25,6 @@ data class HomePaginationKey(
 
 class HomePaginationTrigger {
     private var lastPage: HomePaginationKey? = null
-    private var lastScrollRevision = -1L
 
     fun shouldLoad(
         state: HomeUiState,
@@ -43,10 +42,8 @@ class HomePaginationTrigger {
         scrollRevision: Long,
         isLoading: Boolean,
     ): Boolean {
-        if (isLoading) lastScrollRevision = scrollRevision
-        if (isLoading || page == null || page == lastPage || (lastPage != null && scrollRevision <= lastScrollRevision)) return false
+        if (isLoading || page == null || page == lastPage) return false
         lastPage = page
-        lastScrollRevision = scrollRevision
         return true
     }
 }
