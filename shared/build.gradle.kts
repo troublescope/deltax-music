@@ -171,7 +171,7 @@ kotlin {
         }
         getByName("commonMain") {
             dependencies {
-                implementation("com.github.nyxiereal.glyphmind:glyphmind:0.1.0")
+                implementation(libs.glyphmind)
                 api("com.github.MetrolistGroup.innertubex:innertubex:$innerTubeXVersion")
                 api(libs.runtime)
                 api(libs.foundation)
@@ -211,10 +211,8 @@ kotlin {
 
                 api(libs.shimmer)
 
-                implementation("io.coil-kt.coil3:coil-compose:${libs.versions.coil.get()}") {
-                    exclude(group = "org.jetbrains.skiko", module = "skiko")
-                }
-                implementation("io.coil-kt.coil3:coil-network-core:${libs.versions.coil.get()}")
+                implementation(libs.coil.asProvider())
+                implementation(libs.coil.network.core)
             }
         }
         getByName("commonTest") {
@@ -222,7 +220,7 @@ kotlin {
             kotlin.srcDir(generateOpusTestFixture)
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${libs.versions.kotlinxCoroutines.get()}")
+                implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.ktor.client.mock)
                 implementation(libs.multiplatform.settings.test)
             }
@@ -234,7 +232,7 @@ kotlin {
         getByName("androidHostTest") {
             dependsOn(jvmSharedTest)
             dependencies {
-                implementation("org.robolectric:robolectric:4.18")
+                implementation(libs.robolectric)
             }
         }
         getByName("androidDeviceTest") {

@@ -4,9 +4,6 @@ androidNdk = "30.0.16248370"
 androidxCore = "1.19.1"
 androidxTest = "1.8.0-alpha04"
 componentsResources = "1.13.0-rc01"
-composenativetray = "2.1.7"
-# Every Nucleus module must share one version: they all depend on nucleus.core-runtime.
-nucleusframework = "3.0.0-dev-202611222143"
 kotlin = "2.4.21"
 compose = "1.13.0-rc01"
 composeMaterial3 = "1.13.0-rc01"
@@ -28,20 +25,17 @@ lifecycleProcess = "2.12.0-alpha05"
 datastore = "1.3.0"
 composeReorderable = "3.1.0"
 swipe = "1.3.0"
-filekit = "0.17.1"
-dbusJava = "5.2.2"
+glyphmind = "0.1.0"
 
 shimmer = "1.5.0"
 desugaring = "2.1.5"
 slf4jSimple = "2.1.0-alpha1"
-sqliteJdbc = "3.54.1.0"
 timber = "5.0.1"
 materialKolor = "6.0.0"
 kotlinxSerialization = "1.13.0"
 kotlinxCoroutines = "1.11.0"
 kotlinxDatetime = "0.8.0"
 jna = "5.19.1"
-javacv = "1.5.14"
 koin = "4.3.0-Beta1"
 splashscreen = "1.2.0"
 multiplatformSettings = "1.3.0"
@@ -68,17 +62,9 @@ androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", vers
 androidx-work-runtime = { module = "androidx.work:work-runtime", version.ref = "work" }
 
 components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "componentsResources" }
-composenativetray = { module = "dev.nucleusframework:composenativetray", version.ref = "composenativetray" }
-mediacontrols = { module = "dev.nucleusframework:nucleus.media-control", version.ref = "nucleusframework" }
-decorated-window-tao = { module = "dev.nucleusframework:nucleus.decorated-window-tao", version.ref = "nucleusframework" }
-windowstaskbar = { module = "dev.nucleusframework:nucleus.launcher-windows", version.ref = "nucleusframework" }
-sharesheet = { module = "dev.nucleusframework:nucleus.share", version.ref = "nucleusframework" }
-compose-desktop = { module = "org.jetbrains.compose.desktop:desktop", version.ref = "compose" }
 foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose" }
-filekit-dialogs = { module = "io.github.vinceglb:filekit-dialogs", version.ref = "filekit" }
-dbus-java-core = { module = "com.github.hypfvieh:dbus-java-core", version.ref = "dbusJava" }
+glyphmind = { module = "com.github.nyxiereal.glyphmind:glyphmind", version.ref = "glyphmind" }
 jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
-darkmodedetector = { module = "dev.nucleusframework:nucleus.darkmode-detector", version.ref = "nucleusframework" }
 koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
 koin-androidx-compose = { module = "io.insert-koin:koin-androidx-compose", version.ref = "koin" }
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
@@ -89,11 +75,9 @@ lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.r
 datastore = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 
 compose-reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "composeReorderable" }
-kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutinesGuava" }
 protobuf-javalite = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobufJava" }
 runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4jSimple" }
-sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqliteJdbc" }
 ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose" }
 ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "compose" }
 ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "compose" }
@@ -103,6 +87,7 @@ material3-adaptive-layout = { module = "org.jetbrains.compose.material3.adaptive
 material3-adaptive-navigation-suite = { module = "org.jetbrains.compose.material3:material3-adaptive-navigation-suite", version.ref = "composeMaterial3" }
 materialKolor = { module = "com.materialkolor:material-kolor-material3", version.ref = "materialKolor" }
 coil = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-core = { module = "io.coil-kt.coil3:coil-network-core", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 shimmer = { module = "com.valentinilk.shimmer:compose-shimmer", version.ref = "shimmer" }
 
@@ -119,9 +104,7 @@ room-runtime = { module = "androidx.room3:room3-runtime", version.ref = "room" }
 room-compiler = { module = "androidx.room3:room3-compiler", version.ref = "room" }
 sentry = { module = "io.sentry:sentry", version.ref = "sentry" }
 sentry-android-ndk = { module = "io.sentry:sentry-android-ndk", version.ref = "sentry" }
-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version = "2.8.0-alpha03" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
-ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
@@ -164,4 +147,3 @@ kotlin-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
 protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
 sentry-android = { id = "io.sentry.android.gradle", version = "6.27.0" }
-sentry-jvm = { id = "io.sentry.jvm.gradle", version = "6.27.0" }
