@@ -1,0 +1,25 @@
+package app.deltax.music.locale
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import app.deltax.music.BuildConfig
+import app.deltax.music.shared.generated.resources.Res
+import app.deltax.music.shared.generated.resources.app_language_system
+import app.deltax.music.shared.ui.settings.SettingsChoice
+import org.jetbrains.compose.resources.stringResource
+import java.util.Locale
+
+@Composable
+fun rememberAppLanguageChoices(): List<SettingsChoice> {
+    val systemDefaultLabel = stringResource(Res.string.app_language_system)
+    return remember(systemDefaultLabel) {
+        listOf(SettingsChoice(AppLocale.SYSTEM, systemDefaultLabel)) +
+            BuildConfig.BUNDLED_LANGUAGE_TAGS
+                .split(',')
+                .filter(String::isNotBlank)
+                .map { tag ->
+                    val locale = Locale.forLanguageTag(tag)
+                    SettingsChoice(tag, locale.getDisplayName(locale).ifBlank { tag })
+                }.sortedBy(SettingsChoice::label)
+    }
+}
