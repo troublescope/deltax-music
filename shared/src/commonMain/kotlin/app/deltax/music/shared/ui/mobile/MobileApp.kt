@@ -208,7 +208,6 @@ import app.deltax.music.shared.ui.components.SongSwipeActions
 import app.deltax.music.shared.ui.components.SwipeBackLayout
 import app.deltax.music.shared.ui.components.UnavailableSongSnackbar
 import app.deltax.music.shared.ui.components.images.AsyncImage
-import app.deltax.music.shared.ui.components.lyrics.LyricsTranslationSnackbar
 import app.deltax.music.shared.ui.components.rememberBottomSheetState
 import app.deltax.music.shared.ui.design.expressive.components.ExpressiveMiniPlayerHeight
 import app.deltax.music.shared.ui.icons.MetrolistIcons
@@ -396,7 +395,6 @@ fun MobileApp(
             )
         }
     val homeState by homeViewModel.uiState.collectAsState()
-    LyricsTranslationSnackbar(snackbarHostState, playerViewModel.lyricsTranslationFailures)
     val searchState by searchViewModel.uiState.collectAsState()
     val historyRemovalFailed = stringResource(Res.string.search_history_removal_failed)
     LaunchedEffect(searchState.historyMutationFailures) {
@@ -1424,7 +1422,6 @@ fun MobileApp(
                                                         SettingsPageId.PLAYER_ARTWORK,
                                                         SettingsPageId.MINI_PLAYER_STYLE,
                                                         SettingsPageId.LYRICS_SOURCES,
-                                                        SettingsPageId.LYRICS_AI_TRANSLATION,
                                                         SettingsPageId.LYRICS_ROMANIZATION,
                                                         SettingsPageId.HIDDEN_HOME_ITEMS,
                                                         SettingsPageId.HIDDEN_LIBRARY_ITEMS,

@@ -93,16 +93,13 @@ fun LyricsMenu(
     searchArtist: String = artistName,
     artworkUrl: String? = null,
     lyricsOffsetMs: Int = 0,
-    manualAiTranslationEnabled: Boolean = false,
     providerSearch: LyricsProviderSearch? = null,
     onDismiss: () -> Unit,
     onRefetchLyrics: ((title: String?, artist: String?) -> Unit)? = null,
     onLoadProviderResults: ((title: String?, artist: String?) -> Unit)? = null,
     onSelectProviderResult: ((LyricsProviderResult) -> Unit)? = null,
     onShowLyricsOffset: (() -> Unit)? = null,
-    onManualAiTranslationChange: (Boolean) -> Unit = {},
     onLyricsChanged: (() -> Unit)? = null,
-    onNewAiTranslation: () -> Unit = {},
 ) {
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
@@ -142,7 +139,6 @@ fun LyricsMenu(
         } else {
             Settings.shared.lyricsRomanizationEnabled
         }
-    var manualAiTranslationChecked by remember(manualAiTranslationEnabled) { mutableStateOf(manualAiTranslationEnabled) }
 
     PopupVisibility(visible = showEditDialog) {
         LyricsEditorScreen(
@@ -251,73 +247,6 @@ fun LyricsMenu(
                 Material3MenuGroup(
                     items =
                         listOfNotNull(
-                            Material3MenuItemData(
-                                title = { Text(stringResource(Res.string.ai_translation_for_track)) },
-                                cardColors = menuCardColors,
-                                icon = {
-                                    Icon(
-                                        imageVector = MetrolistIcons.Outlined.Translate,
-                                        contentDescription = null,
-                                    )
-                                },
-                                onClick = {
-                                    if (Settings.shared.lyricsAiTranslationEnabled) {
-                                        manualAiTranslationChecked = !manualAiTranslationChecked
-                                        onManualAiTranslationChange(manualAiTranslationChecked)
-                                    }
-                                },
-                                trailingContent = {
-                                    ExpressiveSwitch(
-                                        checked = manualAiTranslationChecked,
-                                        enabled = Settings.shared.lyricsAiTranslationEnabled,
-                                        onCheckedChange = {
-                                            manualAiTranslationChecked = it
-                                            onManualAiTranslationChange(it)
-                                        },
-                                    )
-                                },
-                            ),
-                            if (manualAiTranslationChecked) {
-                                Material3MenuItemData(
-                                    title = { Text(stringResource(Res.string.ai_translation_new_title)) },
-                                    description = { Text(stringResource(Res.string.ai_translation_new_desc)) },
-                                    cardColors = menuCardColors,
-                                    icon = {
-                                        Icon(
-                                            imageVector = MetrolistIcons.Outlined.Cached,
-                                            contentDescription = null,
-                                        )
-                                    },
-                                    onClick = {
-                                        onNewAiTranslation()
-                                    },
-                                )
-                            } else {
-                                null
-                            },
-                            if (lyrics.any { !it.translatedText.isNullOrBlank() || !it.backgroundTranslatedText.isNullOrBlank() }) {
-                                Material3MenuItemData(
-                                    title = { Text(stringResource(Res.string.lyrics_show_translations)) },
-                                    cardColors = menuCardColors,
-                                    icon = {
-                                        Icon(
-                                            imageVector = MetrolistIcons.Outlined.Translate,
-                                            contentDescription = null,
-                                        )
-                                    },
-                                    onClick = {
-                                        Settings.shared.lyricsShowTranslations = !Settings.shared.lyricsShowTranslations
-                                    },
-                                    trailingContent = {
-                                        ExpressiveSwitch(
-                                            checked = Settings.shared.lyricsShowTranslations,
-                                            onCheckedChange = { Settings.shared.lyricsShowTranslations = it },
-                                        )
-                                    },
-                                )
-                            } else {
-                                null
-                            },
                             Material3MenuItemData(
                                 title = {
                                     Text(

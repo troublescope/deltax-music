@@ -1820,7 +1820,6 @@ internal fun LyricsViewWithPosition(
 
     LyricsView(
         noLyricsText = stringResource(Res.string.lyrics_not_found),
-        translationProgress = uiState.lyricsTranslationProgress,
         autoScrollText = stringResource(Res.string.lyrics_auto_scroll_btn),
         onShareSelection = shareLyrics,
         lyricsProvidedBy = { providerName -> providedByText?.takeIf { providerName == displayedProvider } ?: providerName },

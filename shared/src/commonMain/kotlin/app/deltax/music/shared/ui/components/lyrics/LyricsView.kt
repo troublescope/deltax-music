@@ -121,7 +121,6 @@ import app.deltax.music.shared.generated.resources.lyrics_written_by
 import app.deltax.music.shared.generated.resources.share
 import app.deltax.music.shared.model.AgentInfo
 import app.deltax.music.shared.model.LyricsEntry
-import app.deltax.music.shared.model.LyricsTranslationProgress
 import app.deltax.music.shared.model.MlxMeta
 import app.deltax.music.shared.playback.PlaybackSeekSource
 import app.deltax.music.shared.settings.PlayerBackgroundStyle
@@ -232,7 +231,6 @@ internal fun resolveLyricsTextColor(textColor: Color): Color =
 @Composable
 fun LyricsView(
     noLyricsText: String,
-    translationProgress: LyricsTranslationProgress = LyricsTranslationProgress(),
     autoScrollText: String,
     lyricsProvidedBy: (String) -> String,
     lyrics: List<LyricsEntry>,
@@ -265,8 +263,6 @@ fun LyricsView(
     isLiquidBackground: Boolean = Settings.shared.playerBackgroundStyle == PlayerBackgroundStyle.LIQUID,
 ) {
     val textColor = resolveLyricsTextColor(textColor)
-    val translationShimmer = rememberTranslationShimmer(translationProgress.isTranslating && isVisible)
-    val shimmerColor = MaterialTheme.colorScheme.primary
     val globalOffsetMs = Settings.shared.globalLyricsOffsetMs
     val effectiveOffsetMs = LyricsUtils.combinedLyricsOffsetMs(timingOffsetMs, globalOffsetMs)
     val isPlusLighter = isLiquidBackground && Settings.shared.lyricsPlusLighter && textColor.luminance() > 0.5f
@@ -1256,9 +1252,6 @@ fun LyricsView(
                                                     } else {
                                                         Color.Transparent
                                                     },
-                                                ).lyricsTranslationShimmer(
-                                                    translationShimmer.takeIf { index in translationProgress.lines },
-                                                    shimmerColor,
                                                 ),
                                         textAlign = providerTextAlign,
                                     )
@@ -1570,16 +1563,6 @@ fun LyricsView(
                                                             flipShifter = scrollShifter,
                                                             flipIndex = index,
                                                             isPlusLighter = isPlusLighter,
-                                                            translationShimmer =
-                                                                translationShimmer.takeIf {
-                                                                    idx in
-                                                                        translationProgress.lines
-                                                                },
-                                                            backgroundTranslationShimmer =
-                                                                translationShimmer.takeIf {
-                                                                    idx in
-                                                                        translationProgress.backgroundLines
-                                                                },
                                                         )
                                                     }
                                                 }

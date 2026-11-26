@@ -16,5 +16,4 @@ data class LyricsUiState(
     val timingOffsetMs: Int = 0,
     val isLoading: Boolean = false,
     val providerSearch: LyricsProviderSearch? = null,
-    val manualAiTranslationEnabled: Boolean = false,
 )

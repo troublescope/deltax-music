@@ -10,7 +10,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import app.deltax.music.shared.api.lyrics.AiProviderPresets
 import app.deltax.music.shared.auth.hasSupportedYouTubeAuthCookie
 import app.deltax.music.shared.backup.AutoBackupFrequency
 import app.deltax.music.shared.constants.ActiveLyricsTextPositionKey
@@ -549,17 +548,11 @@ class Settings(
             lyricsOpenRouterOAuthKey.takeIf(String::isNotBlank)?.let { it to "https://openrouter.ai/api/v1/chat/completions" }
                 ?: (lyricsAiApiKeyFor(provider) to lyricsAiBaseUrl)
         } else {
-            val baseUrl =
-                if (provider == "Gemini" && lyricsAiBaseUrl == AiProviderPresets.LEGACY_GEMINI_ENDPOINT) {
-                    AiProviderPresets.find("Gemini")?.endpoint ?: lyricsAiBaseUrl
-                } else {
-                    lyricsAiBaseUrl
-                }
-            lyricsAiApiKeyFor(provider) to baseUrl
+            lyricsAiApiKeyFor(provider) to lyricsAiBaseUrl
         }
 
     var lyricsAiBaseUrl by preference("https://openrouter.ai/api/v1/chat/completions")
-    var lyricsAiModel by preference(AiProviderPresets.DEFAULT_LYRICS_AI_MODEL)
+    var lyricsAiModel by preference("")
 
     var lyricsAiTargetLanguage by preference("device")
     var lyricsAiTranslationMode by preference("Literal")

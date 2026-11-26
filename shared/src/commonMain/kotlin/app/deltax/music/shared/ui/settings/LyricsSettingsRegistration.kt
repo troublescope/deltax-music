@@ -23,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.deltax.music.shared.api.lyrics.AiProviderPresets
 import app.deltax.music.shared.generated.resources.*
 import app.deltax.music.shared.repository.LyricsRepository
 import app.deltax.music.shared.settings.LyricsTextSizeRange
@@ -35,8 +34,6 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.mp.KoinPlatform
 import kotlin.math.roundToInt
-
-private fun isDirectLyricsTranslationProvider(provider: String): Boolean = provider == "DeepL (keyless)" || provider == "Google Translate"
 
 @Composable
 internal fun SettingsUiRegistryBuilder.registerLyricsSettings(host: SharedSettingsHost) {
@@ -219,14 +216,6 @@ internal fun SettingsUiRegistryBuilder.registerLyricsSettings(host: SharedSettin
                     description = stringResource(Res.string.settings_lyrics_sources_overview),
                 )
             }
-            if (SettingsPageId.LYRICS_AI_TRANSLATION in host.availablePages) {
-                navigation(
-                    "aiTranslation",
-                    stringResource(Res.string.settings_ai_lyrics_translation),
-                    SettingsPageId.LYRICS_AI_TRANSLATION,
-                    description = stringResource(Res.string.settings_lyrics_translation_overview),
-                )
-            }
             if (SettingsPageId.LYRICS_ROMANIZATION in host.availablePages) {
                 navigation(
                     "romanization",
@@ -267,222 +256,6 @@ internal fun SettingsUiRegistryBuilder.registerLyricsSettings(host: SharedSettin
                     description = stringResource(Res.string.clear_fetched_lyrics_description),
                     confirmationMessage = stringResource(Res.string.clear_fetched_lyrics_confirm),
                 ) { scope.launch { lyricsRepository.clearFetchedLyrics() } }
-            }
-        }
-    }
-
-    if (SettingsPageId.LYRICS_AI_TRANSLATION in host.availablePages) {
-        val preset = AiProviderPresets.find(settings.lyricsAiProvider) ?: AiProviderPresets.all.first()
-        val provider = preset.id
-        val directProvider = isDirectLyricsTranslationProvider(provider)
-        val oauthConnected = preset.supportsOAuth && settings.lyricsOpenRouterOAuthKey.isNotBlank()
-        val activationChoices =
-            listOf(
-                SettingsChoice("Automatic", stringResource(Res.string.automatic)),
-                SettingsChoice("Manual", stringResource(Res.string.manual)),
-            )
-        val translationModeChoices =
-            listOf(
-                SettingsChoice("Literal", stringResource(Res.string.ai_translation_mode_literal)),
-                SettingsChoice("Transcribed", stringResource(Res.string.ai_translation_mode_transcribed)),
-            )
-        val targetLanguageChoices = host.hostChoices[SettingsHostChoice.LYRICS_TARGET_LANGUAGE].orEmpty()
-        val formalityChoices =
-            listOf(
-                SettingsChoice("default", stringResource(Res.string.ai_deepl_formality_default)),
-                SettingsChoice("prefer_more", stringResource(Res.string.ai_deepl_formality_more)),
-                SettingsChoice("prefer_less", stringResource(Res.string.ai_deepl_formality_less)),
-            )
-        customPage(
-            id = SettingsPageId.LYRICS_AI_SETUP,
-            title = stringResource(Res.string.ai_setup_title),
-            subtitle = stringResource(Res.string.ai_setup_description),
-            icon = MetrolistIcons.Outlined.Translate,
-            tone = SettingsTone.ROSE,
-        )
-        page(
-            id = SettingsPageId.LYRICS_AI_TRANSLATION,
-            title = stringResource(Res.string.settings_ai_lyrics_translation),
-            subtitle = stringResource(Res.string.settings_lyrics_translation_overview),
-            icon = MetrolistIcons.Outlined.Translate,
-            tone = SettingsTone.ROSE,
-        ) {
-            group("setup", stringResource(Res.string.ai_setup_title)) {
-                navigation(
-                    "aiSetup",
-                    stringResource(Res.string.ai_setup_title),
-                    SettingsPageId.LYRICS_AI_SETUP,
-                    description = stringResource(Res.string.ai_setup_description),
-                )
-            }
-            group("runtime", stringResource(Res.string.ai_runtime)) {
-                switch(
-                    id = "translationEnabled",
-                    title = stringResource(Res.string.ai_translation_enable),
-                    description = stringResource(Res.string.ai_translation_enable_description),
-                    checked = settings.lyricsAiTranslationEnabled,
-                ) { settings.lyricsAiTranslationEnabled = it }
-                choice(
-                    id = "activationMode",
-                    title = stringResource(Res.string.ai_translation_trigger),
-                    description =
-                        stringResource(
-                            if (settings.lyricsAiActivationMode == "Manual") {
-                                Res.string.ai_translation_trigger_manual_description
-                            } else {
-                                Res.string.ai_translation_trigger_automatic_description
-                            },
-                        ),
-                    valueLabel = activationChoices.firstOrNull { it.id == settings.lyricsAiActivationMode }?.label,
-                    choices = activationChoices,
-                    selectedChoiceId = settings.lyricsAiActivationMode,
-                ) { settings.lyricsAiActivationMode = it }
-                choice(
-                    id = "translationMode",
-                    title = stringResource(Res.string.mode),
-                    valueLabel = translationModeChoices.firstOrNull { it.id == settings.lyricsAiTranslationMode }?.label,
-                    choices = translationModeChoices,
-                    selectedChoiceId = settings.lyricsAiTranslationMode,
-                    enabled = !directProvider,
-                    description = stringResource(Res.string.settings_translation_mode_summary),
-                ) { settings.lyricsAiTranslationMode = it }
-                if (targetLanguageChoices.isNotEmpty()) {
-                    choice(
-                        id = "targetLanguage",
-                        title = stringResource(Res.string.ai_target_language),
-                        valueLabel = targetLanguageChoices.firstOrNull { it.id == settings.lyricsAiTargetLanguage }?.label,
-                        choices = targetLanguageChoices,
-                        selectedChoiceId = settings.lyricsAiTargetLanguage,
-                    ) { settings.lyricsAiTargetLanguage = it }
-                }
-            }
-            group("provider", stringResource(Res.string.ai_provider)) {
-                custom(
-                    id = "provider",
-                    title = stringResource(Res.string.ai_provider),
-                    description = stringResource(Res.string.settings_translation_provider_summary),
-                ) { onSettingValueChanged ->
-                    AiProviderPicker(preset) { selected ->
-                        settings.setLyricsAiApiKey(provider, settings.lyricsAiApiKeyFor(provider))
-                        settings.lyricsAiProvider = selected.id
-                        if (selected.id != "OpenRouter") settings.lyricsOpenRouterOAuthSession = ""
-                        if (selected.endpoint.isNotBlank()) settings.lyricsAiBaseUrl = selected.endpoint
-                        settings.lyricsAiModel = selected.defaultModel
-                        if (isDirectLyricsTranslationProvider(selected.id)) settings.lyricsAiTranslationMode = "Literal"
-                        onSettingValueChanged()
-                    }
-                }
-            }
-            if (!directProvider) {
-                group("connection", stringResource(Res.string.ai_connection)) {
-                    if (provider == "OpenRouter") {
-                        custom(id = "openRouterSignIn", title = stringResource(Res.string.openrouter_sign_in_title)) {
-                            OpenRouterAuthSetting()
-                        }
-                    }
-                    val apiKey = if (provider == "DeepL") settings.lyricsDeepLApiKey else settings.lyricsAiApiKeyFor(provider)
-                    text(
-                        id = "apiKey",
-                        title = stringResource(if (provider == "DeepL") Res.string.deepl_api_key else Res.string.ai_api_key_label),
-                        description =
-                            if (oauthConnected) {
-                                stringResource(Res.string.ai_openrouter_oauth_active)
-                            } else {
-                                stringResource(
-                                    when {
-                                        apiKey.isNotBlank() -> Res.string.configured
-                                        preset.keyless -> Res.string.ai_api_key_optional
-                                        else -> Res.string.required
-                                    },
-                                )
-                            },
-                        value = apiKey,
-                        enabled = !oauthConnected,
-                        secret = true,
-                    ) {
-                        if (provider == "DeepL") {
-                            settings.lyricsDeepLApiKey = it
-                        } else {
-                            settings.setLyricsAiApiKey(provider, it)
-                        }
-                    }
-                    if (preset.editableEndpoint) {
-                        text(
-                            id = "baseUrl",
-                            title = stringResource(Res.string.ai_base_url),
-                            description = settings.lyricsAiBaseUrl,
-                            value = settings.lyricsAiBaseUrl,
-                            placeholder = preset.endpoint,
-                        ) { settings.lyricsAiBaseUrl = it }
-                    }
-                    if (provider == "DeepL") {
-                        choice(
-                            id = "deepLFormality",
-                            title = stringResource(Res.string.ai_deepl_formality),
-                            valueLabel = formalityChoices.firstOrNull { it.id == settings.lyricsDeepLFormality }?.label,
-                            choices = formalityChoices,
-                            selectedChoiceId = settings.lyricsDeepLFormality,
-                            description = stringResource(Res.string.settings_translation_formality_summary),
-                        ) { settings.lyricsDeepLFormality = it }
-                    }
-                }
-            }
-            if (preset.isAi && !directProvider) {
-                val apiKey = settings.lyricsAiApiKeyFor(provider)
-                val modelsReady = oauthConnected || apiKey.isNotBlank() || preset.publicModelList || preset.keyless
-                val (modelKey, modelUrl) = settings.lyricsAiCredentials(provider)
-                val freeOnly = preset.keyless && modelKey.isBlank()
-                group("models", stringResource(Res.string.ai_models)) {
-                    custom(
-                        id = "translationModel",
-                        title = stringResource(Res.string.ai_translation_model),
-                        enabled = modelsReady,
-                        description = stringResource(Res.string.settings_translation_model_summary),
-                    ) {
-                        AiModelPicker(
-                            title = stringResource(Res.string.ai_translation_model),
-                            description = stringResource(Res.string.settings_translation_model_summary),
-                            preset = preset,
-                            model = settings.lyricsAiModel,
-                            apiKey = modelKey,
-                            baseUrl = modelUrl,
-                            allowBlank = false,
-                            freeOnly = freeOnly,
-                            enabled = modelsReady,
-                        ) { settings.lyricsAiModel = it }
-                    }
-                }
-            }
-            group(
-                id = "prompt",
-                title = stringResource(Res.string.ai_prompt),
-                description = stringResource(Res.string.ai_prompt_line_count_description),
-            ) {
-                text(
-                    id = "systemPrompt",
-                    title = stringResource(Res.string.ai_system_prompt_label),
-                    description =
-                        stringResource(
-                            if (settings.lyricsAiSystemPrompt.isBlank()) Res.string.ai_default_json_array_prompt else Res.string.configured,
-                        ),
-                    value = settings.lyricsAiSystemPrompt,
-                    enabled =
-                        preset.isAi && !directProvider &&
-                            (
-                                oauthConnected ||
-                                    settings.lyricsAiApiKeyFor(provider).isNotBlank() ||
-                                    preset.publicModelList ||
-                                    preset.keyless
-                            ),
-                    multiline = true,
-                ) { settings.lyricsAiSystemPrompt = it }
-            }
-            if (!directProvider) {
-                group("connectionTest", stringResource(Res.string.ai_test_connection)) {
-                    custom(id = "aiConnectionTest", title = stringResource(Res.string.ai_test_connection)) {
-                        AiLyricsConnectionTestSetting(preset, provider, oauthConnected)
-                    }
-                }
             }
         }
     }

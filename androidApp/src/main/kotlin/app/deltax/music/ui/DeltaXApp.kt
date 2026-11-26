@@ -253,7 +253,6 @@ import app.deltax.music.shared.ui.components.PopupContent
 import app.deltax.music.shared.ui.components.PopupVisibility
 import app.deltax.music.shared.ui.components.UnavailableSongSnackbar
 import app.deltax.music.shared.ui.components.images.AsyncImage
-import app.deltax.music.shared.ui.components.lyrics.LyricsTranslationSnackbar
 import app.deltax.music.shared.ui.components.rememberBottomSheetState
 import app.deltax.music.shared.ui.design.expressive.components.ExpressiveMiniPlayerHeight
 import app.deltax.music.shared.ui.haptics.HapticEvent
@@ -745,7 +744,6 @@ fun DeltaXApp(
         HiddenHomeItemsSnackbar(snackbarHostState)
         UnavailableSongSnackbar(snackbarHostState)
         YouTubeSyncSnackbar(snackbarHostState)
-        LyricsTranslationSnackbar(snackbarHostState, playerViewModel.lyricsTranslationFailures)
         listenTogetherManager?.let { manager ->
             ListenTogetherGlobalEvents(manager) { snackbarHostState.showSnackbar(it) }
         }

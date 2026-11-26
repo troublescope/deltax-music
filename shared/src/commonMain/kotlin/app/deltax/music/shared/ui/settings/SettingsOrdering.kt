@@ -168,15 +168,6 @@ internal fun List<SettingsGroupRegistration>.prioritized(page: SettingsPageId): 
                     )
                 }
 
-                SettingsPageId.LYRICS_AI_TRANSLATION to "runtime" -> {
-                    listOf(
-                        "translationEnabled",
-                        "targetLanguage",
-                        "activationMode",
-                        "translationMode",
-                    )
-                }
-
                 else -> {
                     emptyList()
                 }

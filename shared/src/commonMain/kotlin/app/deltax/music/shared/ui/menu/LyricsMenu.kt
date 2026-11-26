@@ -80,7 +80,6 @@ fun LyricsMenu(
     onSelectProvider: (LyricsProviderResult) -> Unit,
     onShowLyricsOffset: () -> Unit,
     onLyricsChanged: () -> Unit,
-    onManualAiTranslationChange: ((Boolean) -> Unit)? = null,
 ) {
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
@@ -102,9 +101,6 @@ fun LyricsMenu(
         } else {
             Settings.shared.lyricsRomanizationEnabled
         }
-    var manualAiTranslationChecked by remember(lyricsUiState.manualAiTranslationEnabled) {
-        mutableStateOf(lyricsUiState.manualAiTranslationEnabled)
-    }
 
     PopupVisibility(visible = showEditDialog) {
         LyricsEditorScreen(
@@ -197,57 +193,6 @@ fun LyricsMenu(
             Material3MenuGroup(
                 items =
                     listOfNotNull(
-                        if (Settings.shared.lyricsAiTranslationEnabled) {
-                            Material3MenuItemData(
-                                title = { Text(stringResource(Res.string.ai_translation_for_track)) },
-                                icon = {
-                                    Icon(
-                                        imageVector = MetrolistIcons.Outlined.Translate,
-                                        contentDescription = null,
-                                    )
-                                },
-                                onClick = {
-                                    manualAiTranslationChecked = !manualAiTranslationChecked
-                                    onManualAiTranslationChange?.invoke(manualAiTranslationChecked)
-                                },
-                                trailingContent = {
-                                    ExpressiveSwitch(
-                                        checked = manualAiTranslationChecked,
-                                        onCheckedChange = {
-                                            manualAiTranslationChecked = it
-                                            onManualAiTranslationChange?.invoke(it)
-                                        },
-                                    )
-                                },
-                            )
-                        } else {
-                            null
-                        },
-                        if (lyricsUiState.lyrics.any {
-                                !it.translatedText.isNullOrBlank() || !it.backgroundTranslatedText.isNullOrBlank()
-                            }
-                        ) {
-                            Material3MenuItemData(
-                                title = { Text(stringResource(Res.string.lyrics_show_translations)) },
-                                icon = {
-                                    Icon(
-                                        imageVector = MetrolistIcons.Outlined.Translate,
-                                        contentDescription = null,
-                                    )
-                                },
-                                onClick = {
-                                    Settings.shared.lyricsShowTranslations = !Settings.shared.lyricsShowTranslations
-                                },
-                                trailingContent = {
-                                    ExpressiveSwitch(
-                                        checked = Settings.shared.lyricsShowTranslations,
-                                        onCheckedChange = { Settings.shared.lyricsShowTranslations = it },
-                                    )
-                                },
-                            )
-                        } else {
-                            null
-                        },
                         Material3MenuItemData(
                             title = {
                                 Text(

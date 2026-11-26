@@ -1,12 +1,7 @@
 package app.deltax.music.shared.repository
 
-import app.deltax.music.shared.api.lyrics.AiModelCatalog
-import app.deltax.music.shared.api.lyrics.AiProviderPresets
 import app.deltax.music.shared.api.lyrics.LyprioLyricsProvider
-import app.deltax.music.shared.api.lyrics.LyricsAiResult
 import app.deltax.music.shared.api.lyrics.LyricsFetcher
-import app.deltax.music.shared.api.lyrics.LyricsTranslationClient
-import app.deltax.music.shared.api.lyrics.LyricsTranslationFailure
 import app.deltax.music.shared.api.lyrics.LyricsUtils
 import app.deltax.music.shared.api.lyrics.MusicVideoLyricsRetimer
 import app.deltax.music.shared.api.lyrics.YouTubeLyricsApi
@@ -14,10 +9,6 @@ import app.deltax.music.shared.api.lyrics.YouTubeLyricsProvider
 import app.deltax.music.shared.api.lyrics.YouTubeSubtitleLyricsProvider
 import app.deltax.music.shared.api.lyrics.YouTubeTranscriptCue
 import app.deltax.music.shared.api.lyrics.lyricsTimingKind
-import app.deltax.music.shared.api.lyrics.lyricsTranslationFailure
-import app.deltax.music.shared.api.lyrics.lyricsTranslationLanguageMatches
-import app.deltax.music.shared.api.lyrics.lyricsTranslationTargetLanguage
-import app.deltax.music.shared.api.lyrics.retryLyricsTranslation
 import app.deltax.music.shared.api.lyrics.romanizer.LyricsRomanizer
 import app.deltax.music.shared.api.lyrics.romanizer.prepareRomanizationDictionaries
 import app.deltax.music.shared.db.daos.DatabaseDao
@@ -26,7 +17,6 @@ import app.deltax.music.shared.model.LyricsEntry
 import app.deltax.music.shared.model.LyricsProvider
 import app.deltax.music.shared.model.LyricsProviderResult
 import app.deltax.music.shared.model.LyricsTimingKind
-import app.deltax.music.shared.model.LyricsTranslationProgress
 import app.deltax.music.shared.model.MlxDocument
 import app.deltax.music.shared.model.MlxSong
 import app.deltax.music.shared.model.WordTimestamp
@@ -261,17 +251,12 @@ private val PLACEHOLDER_LYRIC = Regex("(?:test|sample|placeholder) (?:line|lyric
 
 class LyricsRepository(
     private val lyricsClient: LyricsFetcher,
-    private val lyricsTranslationClient: LyricsTranslationClient,
     private val databaseDao: DatabaseDao? = null,
     private val youtubeLyricsApi: YouTubeLyricsApi? = null,
     private val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     private val prepareDictionaries: suspend (String, Set<String>) -> Boolean = ::prepareRomanizationDictionaries,
     private val providerResultsDispatcher: CoroutineDispatcher? = Dispatchers.Default,
-    private val aiModelCatalog: AiModelCatalog? = null,
-    private val isOnline: () -> Boolean = { PlaybackNetworkStateStore.current.connected },
 ) {
-    private val translationLocksGuard = Mutex()
-    private val translationLocks = linkedMapOf<String, Mutex>()
     private val songwritersCacheGuard = Mutex()
     private val songwritersCache = linkedMapOf<String, List<String>>()
 
@@ -892,29 +877,22 @@ class LyricsRepository(
     suspend fun enrichLyricsEntries(
         videoId: String,
         entries: List<LyricsEntry>,
-        forceAiTranslation: Boolean = false,
-        allowRemoteTranslation: Boolean = true,
         onDictionaryPreparation: suspend () -> Unit = {},
-        onTranslationProgress: suspend (LyricsTranslationProgress) -> Unit = {},
-        onTranslationFailure: suspend (LyricsTranslationFailure) -> Unit = {},
     ): List<LyricsEntry> {
         if (entries.isEmpty()) return entries
-        val targetLanguage = lyricsTranslationTargetLanguage()
-        val translationStyle = Settings.shared.lyricsAiTranslationMode
         val preserveUserTranslations =
             entries.any { !it.translatedText.isNullOrBlank() || !it.backgroundTranslatedText.isNullOrBlank() } &&
                 getUserLyrics(videoId) != null
         var enriched =
-            entries.map { entry ->
-                if (preserveUserTranslations ||
-                    (
-                        entry.translationMode == translationStyle &&
-                            lyricsTranslationLanguageMatches(entry.translationLanguage.orEmpty(), targetLanguage)
-                    )
-                ) {
-                    entry
-                } else {
-                    entry.copy(translatedText = null, backgroundTranslatedText = null)
+            if (preserveUserTranslations) {
+                entries
+            } else {
+                entries.map { entry ->
+                    if (entry.translatedText == null && entry.backgroundTranslatedText == null) {
+                        entry
+                    } else {
+                        entry.copy(translatedText = null, backgroundTranslatedText = null)
+                    }
                 }
             }
         val nonEmpty =
@@ -943,186 +921,6 @@ class LyricsRepository(
             prepareDictionaries(dictionaryDetectionText, enabledLanguages)
         }
         val romanizationEnabled = Settings.shared.isLyricsRomanizationActive
-        val backgroundSources =
-            if (translationStyle == "Romanized") {
-                emptyList()
-            } else {
-                nonEmpty.mapNotNull { (index, entry) ->
-                    backgroundTranslationSourceLine(entry).takeIf(String::isNotBlank)?.let { index to it }
-                }
-            }
-        val separateVocals =
-            translationStyle != "Romanized" &&
-                (backgroundSources.isNotEmpty() || nonEmpty.any { it.second.isBackground })
-        val translationLines =
-            nonEmpty.map { (_, entry) ->
-                if (separateVocals && entry.isBackground) entry.text else translationSourceLine(entry)
-            } + backgroundSources.map { it.second }
-        val sourceWordsPerLine = nonEmpty.map { (_, entry) -> translationSourceWords(entry) } + backgroundSources.map { null }
-        val sourceHash = translationLines.joinToString("\n").hashCode().toString()
-        val skipLanguageDetection = forceAiTranslation || Settings.shared.lyricsAiActivationMode != "Automatic"
-        val remoteTranslationAllowed = allowRemoteTranslation && (isOnline() || isLoopbackAiEndpoint())
-        if (Settings.shared.lyricsAiTranslationEnabled && remoteTranslationAllowed && targetLanguage.isNotBlank() &&
-            (forceAiTranslation || Settings.shared.lyricsAiActivationMode != "Manual")
-        ) {
-            validateSavedAiModels()
-        }
-        val configKey = buildTranslationConfigKey() + if (translationStyle != "Romanized") "|glyphmind-v1|$skipLanguageDetection" else ""
-
-        if (Settings.shared.lyricsAiTranslationEnabled && targetLanguage.isNotBlank()) {
-            val activationMode = Settings.shared.lyricsAiActivationMode
-            val cachedTranslation =
-                loadCachedTranslation(
-                    videoId,
-                    targetLanguage,
-                    translationStyle,
-                    sourceHash,
-                    configKey,
-                    translationLines,
-                    sourceWordsPerLine,
-                    allowNotNeeded = !forceAiTranslation,
-                )
-            val aiResult =
-                if (cachedTranslation != null) {
-                    cachedTranslation.result
-                } else if (!remoteTranslationAllowed || (activationMode == "Manual" && !forceAiTranslation)) {
-                    null
-                } else {
-                    val lockKey = "$videoId|$targetLanguage|$translationStyle|$sourceHash|$configKey"
-                    lockFor(lockKey).withLock {
-                        val lockedCache =
-                            loadCachedTranslation(
-                                videoId,
-                                targetLanguage,
-                                translationStyle,
-                                sourceHash,
-                                configKey,
-                                translationLines,
-                                sourceWordsPerLine,
-                                allowNotNeeded = !forceAiTranslation,
-                            )
-                        if (lockedCache != null) {
-                            lockedCache.result
-                        } else {
-                            try {
-                                translateAndCache(
-                                    videoId = videoId,
-                                    sourceLines = translationLines,
-                                    sourceWordsPerLine = sourceWordsPerLine,
-                                    targetLanguage = targetLanguage,
-                                    translationStyle = translationStyle,
-                                    sourceHash = sourceHash,
-                                    configKey = configKey,
-                                    skipLanguageDetection = skipLanguageDetection,
-                                    onTranslationProgress = { selected ->
-                                        onTranslationProgress(
-                                            LyricsTranslationProgress(
-                                                lines =
-                                                    selected
-                                                        .mapNotNull { nonEmpty.getOrNull(it)?.first }
-                                                        .filter {
-                                                            if (translationStyle == "Romanized") {
-                                                                entries[it].romanizedText.isNullOrBlank()
-                                                            } else {
-                                                                enriched[it].translatedText.isNullOrBlank()
-                                                            }
-                                                        }.toSet(),
-                                                backgroundLines =
-                                                    selected
-                                                        .mapNotNull { backgroundSources.getOrNull(it - nonEmpty.size)?.first }
-                                                        .filter { enriched[it].backgroundTranslatedText.isNullOrBlank() }
-                                                        .toSet(),
-                                            ),
-                                        )
-                                    },
-                                    onTranslationFailure = onTranslationFailure,
-                                )
-                            } finally {
-                                withContext(NonCancellable) { onTranslationProgress(LyricsTranslationProgress()) }
-                            }
-                        }
-                    }
-                }
-            if (aiResult != null) {
-                val needsDictionaryForAlignment =
-                    needsDictionaryForAiAlignment(
-                        nonEmpty,
-                        aiResult.romanizedLines,
-                        aiResult.romanizedWordsPerLine,
-                    )
-                if (romanizationEnabled && enabledLanguages.isNotEmpty() && needsDictionaryForAlignment) {
-                    currentCoroutineContext().ensureActive()
-                    LyricsRomanizer.prepareDictionariesIfNeeded(dictionaryDetectionText, enabledLanguages, prepareDictionary)
-                }
-                enriched =
-                    withContext(Dispatchers.Default) {
-                        val coroutineContext = currentCoroutineContext()
-                        enriched.toMutableList().also { mutable ->
-                            nonEmpty.forEachIndexed { translationIndex, (entryIndex, entry) ->
-                                coroutineContext.ensureActive()
-                                val translated =
-                                    aiResult.translatedLines?.getOrNull(translationIndex)?.takeIf {
-                                        it.isNotBlank() && it != translationLines[translationIndex] &&
-                                            (!preserveUserTranslations || entry.translatedText.isNullOrBlank())
-                                    }
-                                val romanized = aiResult.romanizedLines?.getOrNull(translationIndex)?.takeIf { it.isNotBlank() }
-                                val aiWords = aiResult.romanizedWordsPerLine?.getOrNull(translationIndex)
-                                val wordRom =
-                                    if (!romanized.isNullOrBlank() && !hasCompleteRomanizedWords(entry)) {
-                                        alignRomanizedWords(entry, romanized, aiWords)
-                                    } else {
-                                        null
-                                    }
-                                val alignedWords = wordRom?.let { mergeRomanizedWords(entry, it) }
-                                val mainRoman =
-                                    if (hasCompleteRomanizedWords(entry)) {
-                                        romanizedWordText(entry.romanizedWords)
-                                    } else {
-                                        romanizedWordText(alignedWords)
-                                    }
-                                mutable[entryIndex] =
-                                    entry.copy(
-                                        translatedText = translated ?: entry.translatedText,
-                                        translationLanguage = if (translated != null) targetLanguage else entry.translationLanguage,
-                                        translationMode = if (translated != null) translationStyle else entry.translationMode,
-                                        romanizedText =
-                                            if (!entry.romanizedText.isNullOrBlank()) {
-                                                entry.romanizedText
-                                            } else {
-                                                (
-                                                    mainRoman
-                                                        ?: romanized
-                                                        ?: entry.romanizedText
-                                                )
-                                            },
-                                        romanizedWords =
-                                            if (hasCompleteRomanizedWords(entry)) {
-                                                entry.romanizedWords
-                                            } else {
-                                                alignedWords ?: entry.romanizedWords
-                                            },
-                                    )
-                            }
-                            backgroundSources.forEachIndexed { index, (entryIndex, source) ->
-                                val entry = mutable[entryIndex]
-                                val translated =
-                                    aiResult.translatedLines
-                                        ?.getOrNull(nonEmpty.size + index)
-                                        ?.takeIf {
-                                            it.isNotBlank() && it != source &&
-                                                (!preserveUserTranslations || entry.backgroundTranslatedText.isNullOrBlank())
-                                        }
-                                mutable[entryIndex] =
-                                    entry.copy(
-                                        backgroundTranslatedText = translated ?: entry.backgroundTranslatedText,
-                                        translationLanguage = if (translated != null) targetLanguage else entry.translationLanguage,
-                                        translationMode = if (translated != null) translationStyle else entry.translationMode,
-                                    )
-                            }
-                        }
-                    }
-            }
-        }
 
         val needsDictionary =
             nonEmpty.any { (index, _) -> needsDictionaryPreparation(enriched[index], romanizationEnabled) }
@@ -1192,372 +990,6 @@ class LyricsRepository(
         return withContext(Dispatchers.Default) { enriched.map { it.withAlignedRomanizedWords() } }
     }
 
-    private suspend fun lockFor(key: String): Mutex =
-        translationLocksGuard.withLock {
-            translationLocks.getOrPut(key) {
-                if (translationLocks.size >= 20) {
-                    translationLocks.entries
-                        .firstOrNull { !it.value.isLocked }
-                        ?.let { translationLocks.remove(it.key) }
-                }
-                Mutex()
-            }
-        }
-
-    private suspend fun validateSavedAiModels() {
-        val catalog = aiModelCatalog ?: return
-        val settings = Settings.shared
-        val provider = settings.lyricsAiProvider
-        val preset = AiProviderPresets.find(provider) ?: return
-        val (apiKey, baseUrl) = settings.lyricsAiCredentials(provider)
-        val model = settings.lyricsAiModel
-        val validated = catalog.validatedModel(preset, apiKey, baseUrl, model, freeOnly = preset.keyless && apiKey.isBlank())
-        if (settings.lyricsAiProvider == provider && settings.lyricsAiCredentials(provider) == (apiKey to baseUrl)) {
-            if (settings.lyricsAiModel == model) settings.lyricsAiModel = validated
-        }
-    }
-
-    private suspend fun loadCachedTranslation(
-        videoId: String,
-        targetLanguage: String,
-        translationStyle: String,
-        sourceHash: String,
-        configKey: String,
-        sourceLines: List<String>,
-        sourceWordsPerLine: List<List<String>?>,
-        allowNotNeeded: Boolean,
-    ): CachedLyricsTranslation? {
-        val entity = databaseDao?.lyrics(videoId)?.firstOrNull() ?: return null
-        return readCachedTranslation(
-            entity,
-            targetLanguage,
-            translationStyle,
-            sourceHash,
-            configKey,
-            sourceLines,
-            sourceWordsPerLine,
-            allowNotNeeded = allowNotNeeded,
-        )
-    }
-
-    internal fun readCachedTranslation(
-        entity: LyricsEntity,
-        targetLanguage: String,
-        translationStyle: String,
-        sourceHash: String,
-        configKey: String,
-        sourceLines: List<String>? = null,
-        sourceWordsPerLine: List<List<String>?>? = null,
-        allowNotNeeded: Boolean = true,
-    ): CachedLyricsTranslation? {
-        val configMatches =
-            entity.translationConfigKey == configKey ||
-                (
-                    !entity.translationNotNeeded && entity.translationConfigKey?.let { storedKey ->
-                        completedTranslationConfigKeys(configKey).any { key ->
-                            storedKey.split('|').filterIndexed { index, _ -> index != 4 } ==
-                                key.split('|').filterIndexed { index, _ -> index != 4 }
-                        }
-                    } == true
-                )
-        val valid =
-            entity.translationLanguage == targetLanguage &&
-                entity.translationMode == translationStyle &&
-                entity.translationSourceHash == sourceHash &&
-                configMatches
-        if (!valid) return null
-        if (entity.translationNotNeeded) return CachedLyricsTranslation(null).takeIf { allowNotNeeded }
-        val result = decodeCachedTranslation(entity.translatedLyrics) ?: return null
-        if (sourceLines != null && !isAlignedCachedResult(result, translationStyle, sourceLines, sourceWordsPerLine)) return null
-        return CachedLyricsTranslation(result)
-    }
-
-    // A model served on this machine stays reachable without a network.
-    private fun isLoopbackAiEndpoint(): Boolean {
-        val baseUrl = Settings.shared.lyricsAiCredentials(Settings.shared.lyricsAiProvider).second
-        val host = runCatching { Url(baseUrl).host }.getOrNull() ?: return false
-        return host == "localhost" || host == "::1" || host == "[::1]" || host.startsWith("127.")
-    }
-
-    private suspend fun translateAndCache(
-        videoId: String,
-        sourceLines: List<String>,
-        sourceWordsPerLine: List<List<String>?>,
-        targetLanguage: String,
-        translationStyle: String,
-        sourceHash: String,
-        configKey: String,
-        skipLanguageDetection: Boolean,
-        onTranslationProgress: suspend (List<Int>) -> Unit,
-        onTranslationFailure: suspend (LyricsTranslationFailure) -> Unit,
-    ): LyricsAiResult? {
-        val provider = Settings.shared.lyricsAiProvider
-        val (apiKey, baseUrl) = Settings.shared.lyricsAiCredentials(provider)
-
-        suspend fun failed(
-            stage: String,
-            error: Throwable,
-        ) {
-            val failure = error.lyricsTranslationFailure()
-            PlaybackEventLog.warn(
-                PlaybackEventKind.OTHER,
-                "AI lyrics processing failed.",
-                videoId = videoId,
-                details =
-                    mapOf(
-                        "stage" to stage,
-                        "provider" to provider,
-                        "model" to Settings.shared.lyricsAiModel,
-                        "failure" to failure.name,
-                        "errorType" to error::class.simpleName.orEmpty(),
-                        "inputLines" to sourceLines.size.toString(),
-                    ),
-            )
-            onTranslationFailure(failure)
-        }
-        val detectPerLine = translationStyle != "Romanized"
-        val needed =
-            when {
-                skipLanguageDetection -> {
-                    sourceLines.map(String::isNotBlank)
-                }
-
-                detectPerLine -> {
-                    retryLyricsTranslation {
-                        lyricsTranslationClient
-                            .shouldTranslateLyricsLines(
-                                lines = sourceLines,
-                                targetLanguage = targetLanguage,
-                            )
-                    }.getOrElse { error ->
-                        if (error is CancellationException) throw error
-                        failed("detection", error)
-                        return null
-                    }
-                }
-
-                else -> {
-                    val shouldTranslate =
-                        retryLyricsTranslation {
-                            lyricsTranslationClient
-                                .shouldTranslateLyrics(
-                                    lines = sourceLines,
-                                    targetLanguage = targetLanguage,
-                                )
-                        }.getOrElse { error ->
-                            if (error is CancellationException) throw error
-                            failed("detection", error)
-                            return null
-                        }
-                    sourceLines.map { shouldTranslate && it.isNotBlank() }
-                }
-            }
-        val selected = if (detectPerLine) sourceLines.indices.filter { needed[it] } else sourceLines.indices.toList()
-        if (needed.none { it }) {
-            updateTranslationCache(videoId, LyricsAiResult(), targetLanguage, translationStyle, sourceHash, configKey, notNeeded = true)
-            return null
-        }
-
-        onTranslationProgress(selected)
-        val aiResult =
-            retryLyricsTranslation {
-                lyricsTranslationClient
-                    .translateLyricsLines(
-                        lines = selected.map { sourceLines[it] },
-                        provider = provider,
-                        targetLanguage = targetLanguage,
-                        mode = translationStyle,
-                        apiKey = apiKey,
-                        baseUrl = baseUrl,
-                        model = Settings.shared.lyricsAiModel,
-                        systemPrompt = Settings.shared.lyricsAiSystemPrompt,
-                        deepLApiKey = Settings.shared.lyricsDeepLApiKey,
-                        deepLFormality = Settings.shared.lyricsDeepLFormality,
-                        wordsPerLine = selected.map { sourceWordsPerLine[it] },
-                        preserveTargetLanguage = !skipLanguageDetection,
-                    )
-            }.getOrElse { error ->
-                if (error is CancellationException) throw error
-                failed("translation", error)
-                return null
-            }
-        onTranslationProgress(emptyList())
-        if (!detectPerLine) {
-            updateTranslationCache(videoId, aiResult, targetLanguage, translationStyle, sourceHash, configKey, notNeeded = false)
-            return aiResult
-        }
-        if (!isAlignedCachedResult(aiResult, translationStyle, selected.map { sourceLines[it] }, selected.map { sourceWordsPerLine[it] })) {
-            onTranslationFailure(LyricsTranslationFailure.INVALID_RESPONSE)
-            return null
-        }
-        val positions = selected.withIndex().associate { it.value to it.index }
-        val aligned =
-            LyricsAiResult(
-                translatedLines =
-                    aiResult.translatedLines?.let { lines ->
-                        sourceLines.mapIndexed { index, source -> positions[index]?.let { lines[it] } ?: source }
-                    },
-                romanizedLines =
-                    aiResult.romanizedLines?.let { lines ->
-                        sourceLines.mapIndexed { index, source -> positions[index]?.let { lines[it] } ?: source }
-                    },
-                romanizedWordsPerLine =
-                    aiResult.romanizedWordsPerLine?.let { words ->
-                        sourceLines.indices.map { index -> positions[index]?.let { words.getOrNull(it) } }
-                    },
-            )
-        updateTranslationCache(videoId, aligned, targetLanguage, translationStyle, sourceHash, configKey, notNeeded = false)
-        return aligned
-    }
-
-    private suspend fun updateTranslationCache(
-        videoId: String,
-        result: LyricsAiResult,
-        targetLanguage: String,
-        translationStyle: String,
-        sourceHash: String,
-        configKey: String,
-        notNeeded: Boolean,
-    ) {
-        val current = databaseDao?.lyrics(videoId)?.firstOrNull() ?: return
-        if (current.userLyrics != null) return
-        val serialized =
-            if (notNeeded) {
-                ""
-            } else {
-                SYNCED_TRANSLATION_PREFIX +
-                    buildJsonObject {
-                        put("lines", JsonArray((result.translatedLines ?: emptyList()).map { JsonPrimitive(it) }))
-                        if (!result.romanizedLines.isNullOrEmpty()) {
-                            put("romanizedLines", JsonArray(result.romanizedLines.map { JsonPrimitive(it) }))
-                        }
-                        if (!result.romanizedWordsPerLine.isNullOrEmpty()) {
-                            put(
-                                "romanizedWordsPerLine",
-                                JsonArray(
-                                    result.romanizedWordsPerLine.map { words ->
-                                        words?.let { JsonArray(it.map(::JsonPrimitive)) } ?: JsonNull
-                                    },
-                                ),
-                            )
-                        }
-                    }.toString()
-            }
-        databaseDao.cacheLyricsIfUnchanged(
-            current.copy(
-                translatedLyrics = serialized,
-                translationLanguage = targetLanguage,
-                translationMode = translationStyle,
-                translationSourceHash = sourceHash,
-                translationConfigKey = configKey,
-                translationNotNeeded = notNeeded,
-            ),
-            expected = current,
-        )
-    }
-
-    private fun completedTranslationConfigKeys(configKey: String): List<String> {
-        // Detection policy changes invalidate negative decisions, not completed translations.
-        val baseKey =
-            configKey
-                .removeSuffix(
-                    "|glyphmind-v1|false",
-                ).removeSuffix("|glyphmind-v1|true")
-                .removeSuffix("|passages-v1|false")
-                .removeSuffix("|passages-v1|true")
-        val keys =
-            if (baseKey != configKey) {
-                listOf(
-                    baseKey,
-                    "$baseKey|glyphmind-v1|false",
-                    "$baseKey|glyphmind-v1|true",
-                    "$baseKey|passages-v1|false",
-                    "$baseKey|passages-v1|true",
-                    "$baseKey|vocals-v1|false",
-                    "$baseKey|vocals-v1|true",
-                )
-            } else {
-                listOf(configKey)
-            }
-        return keys.flatMap { key ->
-            listOf(key) +
-                LEGACY_AI_TRANSLATION_CACHE_VERSIONS.map { version ->
-                    key.replaceFirst("$AI_TRANSLATION_CACHE_VERSION|", "$version|")
-                }
-        }
-    }
-
-    internal fun buildTranslationConfigKey(): String =
-        listOf(
-            AI_TRANSLATION_CACHE_VERSION,
-            Settings.shared.lyricsAiProvider,
-            Settings.shared.lyricsAiCredentials(Settings.shared.lyricsAiProvider).second,
-            Settings.shared.lyricsAiModel,
-            "glyphmind-0.1.0",
-            Settings.shared.lyricsAiSystemPrompt
-                .hashCode()
-                .toString(),
-            Settings.shared.lyricsDeepLFormality,
-        ).joinToString("|").let { key ->
-            if (Settings.shared.lyricsAiProvider.startsWith("DeepL", ignoreCase = true)) {
-                val country = Settings.shared.contentCountry.takeUnless { it == GlobalYouTube.SYSTEM } ?: systemCountryCode()
-                "$key|$country"
-            } else {
-                key
-            }
-        }
-
-    private fun isAlignedCachedResult(
-        result: LyricsAiResult,
-        translationStyle: String,
-        sourceLines: List<String>,
-        sourceWordsPerLine: List<List<String>?>?,
-    ): Boolean {
-        val outputLines = if (translationStyle == "Romanized") result.romanizedLines else result.translatedLines
-        if (outputLines == null || outputLines.size != sourceLines.size) return false
-        if (sourceLines.indices.any { sourceLines[it].isBlank() != outputLines[it].isBlank() }) return false
-        val outputWords = result.romanizedWordsPerLine ?: return true
-        if (outputWords.size != sourceLines.size) return false
-        return outputWords.indices.all { index ->
-            val sourceWords = sourceWordsPerLine?.getOrNull(index)
-            sourceWords.isNullOrEmpty() ||
-                (
-                    outputWords[index]?.size == sourceWords.size &&
-                        sourceWords.indices.all { sourceWords[it].isBlank() == outputWords[index]?.get(it).isNullOrBlank() }
-                )
-        }
-    }
-
-    private fun decodeCachedTranslation(value: String): LyricsAiResult? =
-        when {
-            value.isBlank() -> {
-                null
-            }
-
-            value.startsWith(SYNCED_TRANSLATION_PREFIX) -> {
-                runCatching {
-                    val obj = Json.parseToJsonElement(value.removePrefix(SYNCED_TRANSLATION_PREFIX)).jsonObject
-                    val lines = obj["lines"]?.jsonArray?.map { it.jsonPrimitive.contentOrNull.orEmpty() }
-                    val romanized =
-                        obj["romanizedLines"]?.jsonArray?.map { it.jsonPrimitive.contentOrNull.orEmpty() }
-                            ?: obj["romanized_lines"]?.jsonArray?.map { it.jsonPrimitive.contentOrNull.orEmpty() }
-                    val romanizedWords =
-                        obj["romanizedWordsPerLine"]?.jsonArray?.map { line ->
-                            if (line is JsonNull) null else line.jsonArray.map { it.jsonPrimitive.contentOrNull.orEmpty() }
-                        }
-                    LyricsAiResult(
-                        translatedLines = lines,
-                        romanizedLines = romanized,
-                        romanizedWordsPerLine = romanizedWords,
-                    )
-                }.getOrNull()
-            }
-
-            else -> {
-                LyricsAiResult(translatedLines = value.split("\n"))
-            }
-        }
-
     suspend fun clearFetchedLyrics(): Int = databaseDao?.clearFetchedLyrics() ?: 0
 
     suspend fun getUserLyrics(videoId: String): String? = databaseDao?.cachedLyrics(videoId)?.userLyrics
@@ -1577,15 +1009,8 @@ class LyricsRepository(
     }
 
     private companion object {
-        const val AI_TRANSLATION_CACHE_VERSION = "v5"
-        val LEGACY_AI_TRANSLATION_CACHE_VERSIONS = listOf("v2", "v3", "v4")
-        const val SYNCED_TRANSLATION_PREFIX = "METROLIST_TRANSLATION_V2:"
         const val PROVIDER_TIMEOUT_MS = 10_000L
         const val PROVIDER_RESULTS_CONCURRENCY = 12
         const val NEGATIVE_CACHE_TTL_MS = 7 * 24 * 60 * 60_000L
     }
 }
-
-internal data class CachedLyricsTranslation(
-    val result: LyricsAiResult?,
-)

@@ -143,8 +143,6 @@ fun SharedSettingsScreen(
                         rememberProfilePicker = host.rememberMetroEqProfilePicker,
                         isAudioProcessingAvailable = host.isAudioProcessingAvailable,
                     )
-                } else if (page == SettingsPageId.LYRICS_AI_SETUP) {
-                    AiTranslationSetup(host.hostChoices[SettingsHostChoice.LYRICS_TARGET_LANGUAGE].orEmpty(), onBack)
                 } else {
                     host.pageContent(page, onBack, onNavigate)
                 }

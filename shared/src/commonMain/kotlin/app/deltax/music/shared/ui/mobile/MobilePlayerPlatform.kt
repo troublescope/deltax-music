@@ -347,7 +347,6 @@ internal class MobilePlayerPlatform(
                     timingOffsetMs = uiState.lyricsOffsetMs,
                     isLoading = uiState.isLyricsLoading,
                     providerSearch = uiState.lyricsProviderSearch,
-                    manualAiTranslationEnabled = uiState.manualAiTranslationEnabled,
                 ),
             onDismiss = onDismiss,
             onRefetch = { customTitle, customArtist ->
@@ -363,7 +362,6 @@ internal class MobilePlayerPlatform(
                     duration = current.duration,
                     album = current.album,
                     skipCache = true,
-                    forceAiTranslation = uiState.manualAiTranslationEnabled,
                     isCustomQuery = isCustomQuery,
                 )
             },
@@ -385,7 +383,6 @@ internal class MobilePlayerPlatform(
             onSelectProvider = { result -> viewModel.selectLyricsProviderResult(current.id, result) },
             onShowLyricsOffset = onShowLyricsOffset,
             onLyricsChanged = { viewModel.refreshEditedLyrics(current.id) },
-            onManualAiTranslationChange = viewModel::setManualLyricsTranslation,
         )
     }
 

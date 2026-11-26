@@ -1,11 +1,9 @@
 package app.deltax.music.shared.youtube.di
 
 import app.deltax.music.shared.BuildConfig
-import app.deltax.music.shared.api.lyrics.AiModelCatalog
 import app.deltax.music.shared.api.lyrics.LyprioLyricsProvider
 import app.deltax.music.shared.api.lyrics.LyricsClient
 import app.deltax.music.shared.api.lyrics.LyricsFetcher
-import app.deltax.music.shared.api.lyrics.LyricsTranslationClient
 import app.deltax.music.shared.api.lyrics.YouTubeLyricsApi
 import app.deltax.music.shared.api.musicvideo.MusicVideoResolver
 import app.deltax.music.shared.repository.LyricsRepository
@@ -101,13 +99,9 @@ val sharedModule =
             )
         }
         single<LyricsFetcher> { get<LyricsClient>() }
-        single { LyricsTranslationClient(get(), get()) }
-        single { AiModelCatalog(get()) }
         single {
             LyricsRepository(
                 lyricsClient = get(),
-                lyricsTranslationClient = get(),
-                aiModelCatalog = get(),
                 databaseDao = getOrNull(),
                 youtubeLyricsApi = get(),
             )

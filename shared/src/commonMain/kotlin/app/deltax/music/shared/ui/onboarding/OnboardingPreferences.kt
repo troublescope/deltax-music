@@ -28,7 +28,6 @@ fun OnboardingPreferences(
             OnboardingPage.LANGUAGE_LYRICS -> {
                 mapOf(
                     SettingsPageId.CONTENT to setOf("appLanguage"),
-                    SettingsPageId.LYRICS_AI_TRANSLATION to setOf("translationEnabled"),
                     SettingsPageId.LYRICS_ROMANIZATION to setOf("romanizationLargerText", "showSecondaryLyrics"),
                 )
             }

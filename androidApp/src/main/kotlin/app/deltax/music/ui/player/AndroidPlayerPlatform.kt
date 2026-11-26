@@ -390,14 +390,8 @@ class AndroidPlayerPlatform(
             searchArtist = uiState.lyricsQueryArtist ?: currentSong?.artists?.joinToString(", ") { it.name }.orEmpty(),
             artworkUrl = currentSong?.displayThumbnail,
             lyricsOffsetMs = uiState.lyricsOffsetMs,
-            manualAiTranslationEnabled =
-                uiState.manualAiTranslationEnabled ||
-                    uiState.lyrics.any { !it.translatedText.isNullOrBlank() || !it.backgroundTranslatedText.isNullOrBlank() },
             providerSearch = uiState.lyricsProviderSearch,
             onDismiss = onDismiss,
-            onManualAiTranslationChange = { enabled ->
-                viewModel.setManualLyricsTranslation(enabled)
-            },
             onRefetchLyrics = { customTitle, customArtist ->
                 currentSong?.let { song ->
                     val defaultArtist = song.artists.joinToString { it.name }
@@ -413,7 +407,6 @@ class AndroidPlayerPlatform(
                         duration = song.duration,
                         album = song.album,
                         skipCache = true,
-                        forceAiTranslation = uiState.manualAiTranslationEnabled,
                         isCustomQuery = isCustomQuery,
                     )
                 }
@@ -442,9 +435,6 @@ class AndroidPlayerPlatform(
             onShowLyricsOffset = onShowLyricsOffset,
             onLyricsChanged = {
                 currentSong?.let { song -> viewModel.refreshEditedLyrics(song.id) }
-            },
-            onNewAiTranslation = {
-                viewModel.setManualLyricsTranslation(true)
             },
         )
     }

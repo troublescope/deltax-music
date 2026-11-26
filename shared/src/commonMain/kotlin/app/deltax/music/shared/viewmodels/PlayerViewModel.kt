@@ -9,7 +9,6 @@ import app.deltax.music.shared.api.artwork.YouTubeCanvasClip
 import app.deltax.music.shared.api.artwork.isEnabled
 import app.deltax.music.shared.api.artwork.youtubeCanvasPlaybackClips
 import app.deltax.music.shared.api.isLiveLyricsVideo
-import app.deltax.music.shared.api.lyrics.LyricsTranslationFailure
 import app.deltax.music.shared.api.lyrics.LyricsUtils
 import app.deltax.music.shared.api.lyrics.MusicVideoLyricsRetimer
 import app.deltax.music.shared.api.lyrics.lyricsTimingKind
@@ -26,7 +25,6 @@ import app.deltax.music.shared.model.LyricsEntry
 import app.deltax.music.shared.model.LyricsProvider
 import app.deltax.music.shared.model.LyricsProviderResult
 import app.deltax.music.shared.model.LyricsTimingKind
-import app.deltax.music.shared.model.LyricsTranslationProgress
 import app.deltax.music.shared.model.LyricsWithProvider
 import app.deltax.music.shared.model.MlxDocument
 import app.deltax.music.shared.model.MlxMeta
@@ -187,9 +185,6 @@ class PlayerViewModel(
 ) {
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
-    private val translationFailures = Channel<LyricsTranslationFailure>(Channel.BUFFERED)
-    val lyricsTranslationFailures = translationFailures.receiveAsFlow()
-    private var failedTranslationRequestId: Long? = null
 
     fun currentPositionMs(): Long = playerConnection.currentPositionMs()
 
@@ -317,8 +312,6 @@ class PlayerViewModel(
                     lyricsQueryArtist = if (isNewSong) null else _uiState.value.lyricsQueryArtist,
                     lyricsOffsetMs = if (isNewSong) 0 else _uiState.value.lyricsOffsetMs,
                     lyricsProviderSearch = if (isNewSong) null else _uiState.value.lyricsProviderSearch,
-                    manualAiTranslationEnabled = if (isNewSong) false else _uiState.value.manualAiTranslationEnabled,
-                    lyricsTranslationProgress = if (isNewSong) LyricsTranslationProgress() else _uiState.value.lyricsTranslationProgress,
                     mvVideoId = if (isNewSong) null else _uiState.value.mvVideoId,
                     mvPositionMap = if (isNewSong) null else _uiState.value.mvPositionMap,
                     mvLyricsRetimed = if (isNewSong) false else _uiState.value.mvLyricsRetimed,
@@ -1381,7 +1374,6 @@ class PlayerViewModel(
     fun loadLyrics(
         song: SongUiModel,
         skipCache: Boolean = false,
-        forceAiTranslation: Boolean = false,
         cacheOnly: Boolean = false,
     ) {
         loadLyrics(
@@ -1391,7 +1383,6 @@ class PlayerViewModel(
             duration = song.duration,
             album = song.album,
             skipCache = skipCache,
-            forceAiTranslation = forceAiTranslation,
             cacheOnly = cacheOnly,
             preferVideoProviders = isLiveLyricsVideo(song.musicVideoType, song.title),
         )
@@ -1404,13 +1395,12 @@ class PlayerViewModel(
         duration: Long? = null,
         album: String? = null,
         skipCache: Boolean = false,
-        forceAiTranslation: Boolean = false,
         preferVideoProviders: Boolean = false,
         isCustomQuery: Boolean = false,
         cacheOnly: Boolean = false,
     ) {
         val requestKey =
-            "$songId\u0000$title\u0000$artist\u0000$isCustomQuery\u0000$forceAiTranslation\u0000" +
+            "$songId\u0000$title\u0000$artist\u0000$isCustomQuery\u0000" +
                 "${Settings.shared.lyricsProviderOrder}\u0000${Settings.shared.lyricsEnabledProviders}\u0000" +
                 "${Settings.shared.lyricsYoutubeCaptionsEnabled}\u0000${Settings.shared.preferWordSyncedLyrics}"
         if (!skipCache && lyricsRequestKey == requestKey && (cacheOnly || !lyricsRequestCacheOnly)) return
@@ -1425,7 +1415,6 @@ class PlayerViewModel(
             _uiState.value.copy(
                 lyricsQueryTitle = title,
                 lyricsQueryArtist = artist,
-                lyricsTranslationProgress = LyricsTranslationProgress(),
             )
         lyricsFetchJob =
             viewModelScope.launch {
@@ -1495,7 +1484,6 @@ class PlayerViewModel(
                                     lyricsProvider = lyricsProviderLabel(result?.provider, lyricsDoc),
                                     lyricsOffsetMs = if (loaded) _uiState.value.lyricsOffsetMs else lyricsOffsetMs,
                                     isLyricsLoading = skipCache || entries.isEmpty(),
-                                    manualAiTranslationEnabled = forceAiTranslation,
                                     mvLyricsRetimed = false,
                                 )
                             loaded = entries.isNotEmpty()
@@ -1505,8 +1493,6 @@ class PlayerViewModel(
                                 songId,
                                 parsedLyrics,
                                 requestId,
-                                forceAiTranslation,
-                                allowRemoteTranslation = false,
                                 onDictionaryPreparation = {
                                     if (!published && _uiState.value.lyrics.isEmpty()) publishEntries(parsedLyrics)
                                 },
@@ -1554,7 +1540,7 @@ class PlayerViewModel(
                     }
                     if (parsedLyrics.isEmpty()) return@launch
 
-                    val enrichedLyrics = enrichLyrics(songId, parsedLyrics, requestId, forceAiTranslation)
+                    val enrichedLyrics = enrichLyrics(songId, parsedLyrics, requestId)
                     if (!isCurrentLyricsRequest(songId, requestId)) return@launch
                     if (enrichedLyrics != parsedLyrics && !_uiState.value.mvLyricsRetimed) {
                         _uiState.value =
@@ -1563,39 +1549,12 @@ class PlayerViewModel(
                             )
                     }
 
-                    retimeLyricsIfVideoModeActive(songId, forceAiTranslation, requestId, skipCache)
+                    retimeLyricsIfVideoModeActive(songId, requestId, skipCache)
                 } finally {
                     if (isCurrentLyricsRequest(songId, requestId)) {
                         if (!loaded) lyricsRequestKey = null
                         _uiState.value = _uiState.value.copy(isLyricsLoading = false)
                     }
-                }
-            }
-    }
-
-    fun setManualLyricsTranslation(enabled: Boolean) {
-        val state = _uiState.value
-        val songId = state.currentSong?.id ?: return
-        if (state.lyrics.isEmpty()) return
-        lyricsRequestCacheOnly = false
-        val requestId = ++lyricsRequestId
-        val previousFetchJob = lyricsFetchJob
-        val previousRetimeJob = retimeLyricsJob
-        previousFetchJob?.cancel()
-        previousRetimeJob?.cancel()
-        _uiState.value = state.copy(manualAiTranslationEnabled = enabled, lyricsTranslationProgress = LyricsTranslationProgress())
-        lyricsFetchJob =
-            viewModelScope.launch {
-                previousFetchJob?.join()
-                previousRetimeJob?.join()
-                if (!isCurrentLyricsRequest(songId, requestId)) return@launch
-                try {
-                    val enriched = enrichLyrics(songId, state.lyrics, requestId, forceAiTranslation = enabled)
-                    if (isCurrentLyricsRequest(songId, requestId)) {
-                        _uiState.value = _uiState.value.copy(lyrics = enriched)
-                    }
-                } finally {
-                    if (isCurrentLyricsRequest(songId, requestId)) _uiState.value = _uiState.value.copy(isLyricsLoading = false)
                 }
             }
     }
@@ -1607,7 +1566,6 @@ class PlayerViewModel(
 
     private fun retimeLyricsIfVideoModeActive(
         songId: String,
-        forceAiTranslation: Boolean = _uiState.value.manualAiTranslationEnabled,
         requestId: Long = lyricsRequestId,
         skipCache: Boolean = false,
     ) {
@@ -1640,7 +1598,7 @@ class PlayerViewModel(
                             } ?: return@launch
                         val parsedLyrics = lyricsDoc.lines
                         val enrichedLyrics =
-                            enrichLyrics(songId, parsedLyrics, requestId, forceAiTranslation)
+                            enrichLyrics(songId, parsedLyrics, requestId)
                         currentCoroutineContext().ensureActive()
                         if (isCurrentLyricsRequest(songId, requestId)) {
                             _uiState.value =
@@ -1717,7 +1675,7 @@ class PlayerViewModel(
                             prefersLyrics(videoLyrics, LyricsWithProvider(rawLyrics, _uiState.value.rawLyricsProvider.orEmpty()))
                     )
                 ) {
-                    val enrichedVideoLyrics = enrichLyrics(songId, videoLyricsDoc.lines, requestId, forceAiTranslation)
+                    val enrichedVideoLyrics = enrichLyrics(songId, videoLyricsDoc.lines, requestId)
                     currentCoroutineContext().ensureActive()
                     if (isCurrentLyricsRequest(songId, requestId)) {
                         _uiState.value =
@@ -1749,7 +1707,7 @@ class PlayerViewModel(
                     }
 
                 if (mapRetimedDoc != null) {
-                    applyRetimedLyrics(songId, requestId, forceAiTranslation, mapRetimedDoc)
+                    applyRetimedLyrics(songId, requestId, mapRetimedDoc)
                 }
 
                 val subtitleRetimedDoc =
@@ -1769,7 +1727,7 @@ class PlayerViewModel(
                     )
 
                 if (subtitleRetimedDoc != null) {
-                    applyRetimedLyrics(songId, requestId, forceAiTranslation, subtitleRetimedDoc)
+                    applyRetimedLyrics(songId, requestId, subtitleRetimedDoc)
                 } else if (mapRetimedDoc == null) {
                     Logger.d(
                         TAG,
@@ -1782,7 +1740,6 @@ class PlayerViewModel(
     private suspend fun applyRetimedLyrics(
         songId: String,
         requestId: Long,
-        forceAiTranslation: Boolean,
         retimedDoc: MlxDocument,
     ) {
         if (!isCurrentLyricsRequest(songId, requestId)) return
@@ -1790,7 +1747,7 @@ class PlayerViewModel(
             TAG,
             "[LyricsRetimer] successfully retimed ${retimedDoc.lines.size} lines for $songId",
         )
-        val enrichedRetimed = enrichLyrics(songId, retimedDoc.lines, requestId, forceAiTranslation)
+        val enrichedRetimed = enrichLyrics(songId, retimedDoc.lines, requestId)
         currentCoroutineContext().ensureActive()
         if (isCurrentLyricsRequest(songId, requestId)) {
             _uiState.value =
@@ -1859,7 +1816,6 @@ class PlayerViewModel(
         _uiState.value =
             _uiState.value.copy(
                 isLyricsLoading = false,
-                lyricsTranslationProgress = LyricsTranslationProgress(),
             )
         lyricsFetchJob =
             viewModelScope.launch {
@@ -1888,7 +1844,6 @@ class PlayerViewModel(
                         rawLyricsProvider = effectiveResult.providerName,
                         lyricsUserSelected = true,
                         lyricsProvider = lyricsProviderLabel(effectiveResult.providerName, document),
-                        manualAiTranslationEnabled = false,
                         mvLyricsRetimed = false,
                     )
                 if (mlxSongwriters.isEmpty()) {
@@ -1912,37 +1867,13 @@ class PlayerViewModel(
         songId: String,
         entries: List<LyricsEntry>,
         requestId: Long,
-        forceAiTranslation: Boolean = false,
-        allowRemoteTranslation: Boolean = true,
         onDictionaryPreparation: suspend () -> Unit = {},
-    ): List<LyricsEntry> {
-        try {
-            return lyricsRepository.enrichLyricsEntries(
-                songId,
-                entries,
-                forceAiTranslation,
-                allowRemoteTranslation && failedTranslationRequestId != requestId,
-                onDictionaryPreparation,
-                onTranslationProgress = { progress ->
-                    if (isCurrentLyricsRequest(songId, requestId)) {
-                        _uiState.value = _uiState.value.copy(lyricsTranslationProgress = progress)
-                    }
-                },
-                onTranslationFailure = { failure ->
-                    if (isCurrentLyricsRequest(songId, requestId)) {
-                        failedTranslationRequestId = requestId
-                        _uiState.value =
-                            _uiState.value.copy(manualAiTranslationEnabled = false, lyricsTranslationProgress = LyricsTranslationProgress())
-                        translationFailures.trySend(failure)
-                    }
-                },
-            )
-        } finally {
-            if (isCurrentLyricsRequest(songId, requestId)) {
-                _uiState.value = _uiState.value.copy(lyricsTranslationProgress = LyricsTranslationProgress())
-            }
-        }
-    }
+    ): List<LyricsEntry> =
+        lyricsRepository.enrichLyricsEntries(
+            videoId = songId,
+            entries = entries,
+            onDictionaryPreparation = onDictionaryPreparation,
+        )
 
     private fun resolveActiveLyricsOffsetVideoId(songId: String): String {
         val currentSong = _uiState.value.currentSong
@@ -1999,7 +1930,7 @@ class PlayerViewModel(
         val previousRetimeJob = retimeLyricsJob
         previousFetchJob?.cancel()
         previousRetimeJob?.cancel()
-        _uiState.value = _uiState.value.copy(isLyricsLoading = false, lyricsTranslationProgress = LyricsTranslationProgress())
+        _uiState.value = _uiState.value.copy(isLyricsLoading = false)
         lyricsFetchJob =
             viewModelScope.launch {
                 previousFetchJob?.join()
@@ -2078,8 +2009,6 @@ class PlayerViewModel(
         val lyricsQueryArtist: String? = null,
         val lyricsOffsetMs: Int = 0,
         val lyricsProviderSearch: LyricsProviderSearch? = null,
-        val manualAiTranslationEnabled: Boolean = false,
-        val lyricsTranslationProgress: LyricsTranslationProgress = LyricsTranslationProgress(),
         val isLyricsVisible: Boolean = false,
         val isLyricsExpanded: Boolean = false,
         val dominantColor: Color = DefaultThemeColor,

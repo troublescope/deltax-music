@@ -359,7 +359,7 @@ internal fun OnboardingScreen(
                         SharedSettingsHost(
                             platform = SettingsPlatform.ANDROID,
                             onClose = {},
-                            availablePages = setOf(SettingsPageId.LYRICS_AI_TRANSLATION, SettingsPageId.LYRICS_ROMANIZATION),
+                            availablePages = setOf(SettingsPageId.LYRICS_ROMANIZATION),
                             hostChoices = mapOf(SettingsHostChoice.APP_LANGUAGE to languages),
                             onHostChoiceSelected = { _, selected ->
                                 Settings.shared.appLanguage = selected
