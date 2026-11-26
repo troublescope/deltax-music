@@ -1,26 +1,28 @@
 # Home scrolling and player gestures, exercised on the low-end benchmark device.
 # AGP expands these source-level rules and R8 rewrites them for the release DEX.
 # Cold start holds the splash screen until App startup, settings, Koin and the theme are ready.
-HSPLcom/metrolist/android/App**->**(**)**
-HSPLcom/metrolist/android/MainActivity**->**(**)**
-HSPLcom/metrolist/android/NavigationRestorationViewModel**->**(**)**
-HSPLcom/metrolist/android/di/**->**(**)**
-HSPLcom/metrolist/android/locale/**->**(**)**
-HSPLcom/metrolist/android/ui/theme/**->**(**)**
-HSPLcom/metrolist/shared/settings/**->**(**)**
-HSPLcom/metrolist/shared/ui/theme/**->**(**)**
-HSPLcom/metrolist/android/ui/MetrolistAppKt**->**(**)**
-HSPLcom/metrolist/android/ui/screens/HomeScreenKt**->**(**)**
-HSPLcom/metrolist/shared/ui/screens/HomeContentKt**->**(**)**
-HSPLcom/metrolist/shared/ui/components/SpeedDialGridKt**->**(**)**
-HSPLcom/metrolist/android/ui/components/MiniPlayerKt**->**(**)**
-HPLcom/metrolist/shared/ui/components/BottomSheetKt**->**(**)**
-HPLcom/metrolist/shared/ui/components/BottomSheetState**->**(**)**
+HSPLapp/deltax/music/App**->**(**)**
+HSPLapp/deltax/music/MainActivity**->**(**)**
+HSPLapp/deltax/music/NavigationRestorationViewModel**->**(**)**
+HSPLapp/deltax/music/di/**->**(**)**
+HSPLapp/deltax/music/locale/**->**(**)**
+HSPLapp/deltax/music/ui/theme/**->**(**)**
+HSPLapp/deltax/music/shared/settings/**->**(**)**
+HSPLapp/deltax/music/shared/ui/theme/**->**(**)**
+HSPLapp/deltax/music/ui/DeltaXAppKt**->**(**)**
+HSPLapp/deltax/music/ui/screens/HomeScreenKt**->**(**)**
+HSPLapp/deltax/music/shared/ui/screens/HomeContentKt**->**(**)**
+HSPLapp/deltax/music/shared/ui/components/SpeedDialGridKt**->**(**)**
+HSPLapp/deltax/music/shared/ui/components/YTItemCardsKt**->**(**)**
+HSPLapp/deltax/music/shared/ui/components/images/AsyncImageKt**->**(**)**
+HSPLapp/deltax/music/ui/components/MiniPlayerKt**->**(**)**
+HPLapp/deltax/music/shared/ui/components/BottomSheetKt**->**(**)**
+HPLapp/deltax/music/shared/ui/components/BottomSheetState**->**(**)**
 # The expanded player, queue, progress sliders and lyrics redraw every frame while visible.
-HPLcom/metrolist/shared/ui/player/**->**(**)**
-HPLcom/metrolist/android/ui/player/**->**(**)**
-HPLcom/metrolist/shared/ui/components/sliders/**->**(**)**
-HPLcom/metrolist/shared/ui/components/lyrics/**->**(**)**
+HPLapp/deltax/music/shared/ui/player/**->**(**)**
+HPLapp/deltax/music/android/ui/player/**->**(**)**
+HPLapp/deltax/music/shared/ui/components/sliders/**->**(**)**
+HPLapp/deltax/music/shared/ui/components/lyrics/**->**(**)**
 # Background playback runs these on ExoPlayer's playback thread for hours; keep them out of the interpreter.
 HSPLandroidx/media3/exoplayer/**->**(**)**
 HSPLandroidx/media3/common/**->**(**)**
@@ -28,6 +30,6 @@ HSPLandroidx/media3/decoder/**->**(**)**
 HSPLandroidx/media3/extractor/**->**(**)**
 HSPLandroidx/media3/datasource/**->**(**)**
 HSPLandroidx/media3/session/**->**(**)**
-HSPLcom/metrolist/android/playback/**->**(**)**
-HSPLcom/metrolist/shared/playback/**->**(**)**
-HSPLcom/metrolist/shared/youtube/playback/**->**(**)**
+HSPLapp/deltax/music/playback/**->**(**)**
+HSPLapp/deltax/music/shared/playback/**->**(**)**
+HSPLapp/deltax/music/shared/youtube/playback/**->**(**)**
