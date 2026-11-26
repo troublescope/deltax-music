@@ -4,8 +4,11 @@ import app.deltax.music.shared.model.SongItem
 import app.deltax.music.shared.settings.LoudnessLevel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.nextDown
 import kotlin.math.pow
+import kotlin.math.sin
 
 data class PlaybackCrossfadeState<T>(
     val nextSong: T,
@@ -115,7 +118,11 @@ fun playbackCrossfadeGains(progress: Float): Pair<Float, Float> {
     if (progress >= 1f) return 0f to 1f
     val t = progress.coerceIn(0f, 1f)
     val shaped = t * t * t * (t * (t * 6f - 15f) + 10f)
-    return (1f - shaped).coerceAtLeast(0f) to shaped.coerceAtMost(1f.nextDown())
+    // Equal-power curve preserves perceived loudness across the transition midpoint without a -3 dB dip.
+    val angle = shaped * (PI / 2.0)
+    val outgoing = cos(angle).toFloat().coerceIn(0f, 1f)
+    val incoming = sin(angle).toFloat().coerceIn(0f, 1f.nextDown())
+    return outgoing to incoming
 }
 
 fun playbackNormalizationGain(

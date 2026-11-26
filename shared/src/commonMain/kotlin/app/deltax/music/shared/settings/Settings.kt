@@ -466,7 +466,7 @@ class Settings(
         AndroidAutoPinnedPlaylistPlaybackModeKey,
         AutomotivePinnedPlaylistPlaybackMode.IN_ORDER,
     )
-    var crossfadeEnabled by preference(false)
+    var crossfadeEnabled by preference(true)
     var crossfadeDuration by preference(10f)
     var crossfadeGapless by preference(true)
     var sponsorBlockEnabled by preference(SponsorBlockEnabledKey, false)
