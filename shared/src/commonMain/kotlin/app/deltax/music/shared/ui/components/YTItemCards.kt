@@ -506,7 +506,7 @@ fun YTGridItem(
     Column(
         modifier =
             modifier
-                .alpha(if (itemEnabled) 1f else 0.38f)
+                .graphicsLayer { alpha = if (itemEnabled) 1f else 0.38f }
                 .clip(gridCellShape())
                 .focusOutline(gridCellShape())
                 .artworkMenuActions(onMenuClick, menuActionLabel)
@@ -786,7 +786,7 @@ fun YTListItem(
             modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
-                .alpha(if (itemEnabled) 1f else 0.38f)
+                .graphicsLayer { alpha = if (itemEnabled) 1f else 0.38f }
                 .clip(if (currentSong) CircleShape else gridCellShape())
                 .background(colors.container)
                 .focusOutline(if (currentSong) CircleShape else gridCellShape())

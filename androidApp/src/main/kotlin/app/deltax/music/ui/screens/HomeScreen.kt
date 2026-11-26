@@ -70,7 +70,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.deltax.music.LocalMiniPlayerBottomInset
 import app.deltax.music.LocalStartupPresentation
 import app.deltax.music.playback.LocalPlayerConnection
-import app.deltax.music.shared.auth.AuthManager
 import app.deltax.music.shared.db.MusicDatabase
 import app.deltax.music.shared.generated.resources.Res
 import app.deltax.music.shared.generated.resources.error_occurred
@@ -162,9 +161,10 @@ fun HomeScreen(
             .distinctUntilChanged()
     }.collectAsStateWithLifecycle(initialValue = emptySet())
     val isOffline = !networkState.connected
-    val isHomeItemEnabled: (YTItem) -> Boolean = { item ->
-        !isOffline || item.isAvailableOffline(cachedSongIds)
-    }
+    val isHomeItemEnabled: (YTItem) -> Boolean =
+        remember(isOffline, cachedSongIds) {
+            { item -> !isOffline || item.isAvailableOffline(cachedSongIds) }
+        }
 
     val listState = rememberLazyListState()
 
@@ -180,11 +180,11 @@ fun HomeScreen(
 
     var selectedMenuItem by remember { mutableStateOf<YTItem?>(null) }
     var showSpeedDialSurpriseMenu by remember { mutableStateOf(false) }
-    val authManager = remember { AuthManager() }
     var isRefreshing by remember { mutableStateOf(false) }
     val showTopRefreshIndicator = isRefreshing || uiState.isRefreshing
     val isTv = LocalIsTv.current
-    var showFloatingActions by remember { mutableStateOf(true) }
+    // Keep scroll-driven visibility out of HomeScreen's composition scope so scrolling never recomposes the feed.
+    val showFloatingActions = remember { mutableStateOf(true) }
     val fabNestedScrollConnection =
         remember {
             object : NestedScrollConnection {
@@ -194,8 +194,8 @@ fun HomeScreen(
                 ): Offset {
                     if (source == NestedScrollSource.UserInput) {
                         when {
-                            available.y < -1f -> showFloatingActions = false
-                            available.y > 1f -> showFloatingActions = true
+                            available.y < -1f -> showFloatingActions.value = false
+                            available.y > 1f -> showFloatingActions.value = true
                         }
                     }
                     return Offset.Zero
@@ -213,88 +213,130 @@ fun HomeScreen(
     val initialTvFocusRequester = remember { FocusRequester() }
     RequestTvFocus(initialTvFocusRequester, enabled = rootActive && !showTopRefreshIndicator)
 
-    fun shuffleHomeContent() {
-        if (playerConnection == null) {
-            Toast.makeText(context, playerNotReadyText, Toast.LENGTH_SHORT).show()
-            return
+    val shuffleHomeContent =
+        remember(playerConnection, context, playerNotReadyText, noPlayableItemsText, shuffleText, uiState, isHomeItemEnabled) {
+            {
+                if (playerConnection == null) {
+                    Toast.makeText(context, playerNotReadyText, Toast.LENGTH_SHORT).show()
+                } else {
+                    val songs = uiState.loadedHomeSongs().filter(isHomeItemEnabled)
+                    if (songs.isEmpty()) {
+                        Toast.makeText(context, noPlayableItemsText, Toast.LENGTH_SHORT).show()
+                    } else {
+                        playerConnection.shuffleQueue(
+                            songs,
+                            queueTitle = shuffleText,
+                        )
+                    }
+                }
+            }
         }
-        val songs = uiState.loadedHomeSongs().filter(isHomeItemEnabled)
-        if (songs.isEmpty()) {
-            Toast.makeText(context, noPlayableItemsText, Toast.LENGTH_SHORT).show()
-            return
-        }
-        playerConnection.shuffleQueue(
-            songs,
-            queueTitle = shuffleText,
-        )
-    }
 
-    val homeContent: @Composable () -> Unit = {
-        val sharedText = homeContentText()
-        val onHomeItemClick: (YTItem) -> Unit = { item ->
-            handleItemClick(
-                item,
-                onNavigateToAlbum,
-                onNavigateToArtist,
-                onNavigateToPlaylist,
-                onNavigateToPodcast,
-                playerConnection,
-                scope,
-                onNavigateToBrowse,
-                startVideo = false,
-            )
+    val sharedText = homeContentText()
+    val onHomeItemClick: (YTItem) -> Unit =
+        remember(
+            onNavigateToAlbum,
+            onNavigateToArtist,
+            onNavigateToPlaylist,
+            onNavigateToPodcast,
+            playerConnection,
+            scope,
+            onNavigateToBrowse,
+        ) {
+            { item ->
+                handleItemClick(
+                    item,
+                    onNavigateToAlbum,
+                    onNavigateToArtist,
+                    onNavigateToPlaylist,
+                    onNavigateToPodcast,
+                    playerConnection,
+                    scope,
+                    onNavigateToBrowse,
+                    startVideo = false,
+                )
+            }
         }
-        HomeContent(
-            uiState = uiState,
-            shelfCache = viewModel.shared.shelfCache,
-            onLoadMore = viewModel.shared::loadMoreSections,
-            text = sharedText,
-            onVideoItemClick = { item ->
+    val onVideoItemClick: (YTItem) -> Unit =
+        remember(playerConnection, scope, onNavigateToVideoBrowse) {
+            { item ->
                 when (item) {
                     is SongItem -> playSong(item, playerConnection, scope)
                     is BrowseItem -> onNavigateToVideoBrowse(item.id, item.params, item.title)
                     else -> Unit
                 }
-            },
-            onItemClick = onHomeItemClick,
-            onSpeedDialItemClick = { item ->
+            }
+        }
+    val onSpeedDialItemClick: (YTItem) -> Unit =
+        remember(playerConnection, onHomeItemClick) {
+            { item ->
                 if (item is SongItem) {
                     playerConnection?.startRadio(item)
                 } else {
                     onHomeItemClick(item)
                 }
-            },
-            onItemLongClick = { selectedMenuItem = it },
-            onShuffleSongs = { songs -> playerConnection?.shuffleQueue(songs, queueTitle = sharedText.shuffle) },
-            onPlaySongs = { songs -> playerConnection?.playQueue(songs, queueTitle = sharedText.quickPicks) },
+            }
+        }
+    val onItemLongClick: (YTItem) -> Unit = remember { { selectedMenuItem = it } }
+    val onShuffleSongs: (List<SongItem>) -> Unit =
+        remember(playerConnection, sharedText.shuffle) {
+            { songs -> playerConnection?.shuffleQueue(songs, queueTitle = sharedText.shuffle) }
+        }
+    val onPlaySongs: (List<SongItem>) -> Unit =
+        remember(playerConnection, sharedText.quickPicks) {
+            { songs -> playerConnection?.playQueue(songs, queueTitle = sharedText.quickPicks) }
+        }
+    val onPlayAlbum: (app.deltax.music.shared.model.AlbumItem) -> Unit =
+        remember(playerConnection) {
+            { album -> playerConnection?.playAlbum(album.id, album.title) }
+        }
+    val onShowSurpriseMenu: () -> Unit = remember { { showSpeedDialSurpriseMenu = true } }
+    val currentSongId = remember(currentSong) { derivedStateOf { currentSong.value?.id } }
+    val contentPadding =
+        remember(topPadding, miniPlayerInset) {
+            PaddingValues(
+                top = topPadding,
+                bottom = miniPlayerInset + 16.dp,
+            )
+        }
+    val homeModifier =
+        remember(startupPresentation) {
+            Modifier
+                .fillMaxSize()
+                .onGloballyPositioned {
+                    startupPresentation?.homeLaidOut = true
+                }.focusGroup()
+                .focusRestorer()
+        }
+
+    val homeContent: @Composable () -> Unit = {
+        HomeContent(
+            uiState = uiState,
+            shelfCache = viewModel.shared.shelfCache,
+            onLoadMore = viewModel.shared::loadMoreSections,
+            text = sharedText,
+            onVideoItemClick = onVideoItemClick,
+            onItemClick = onHomeItemClick,
+            onSpeedDialItemClick = onSpeedDialItemClick,
+            onItemLongClick = onItemLongClick,
+            onShuffleSongs = onShuffleSongs,
+            onPlaySongs = onPlaySongs,
             onLibraryClick = onNavigateToLibrary,
             onLocalShelfClick = onNavigateToHomeSection,
-            onArtistClick = { artistId -> onNavigateToArtist(artistId) },
-            onPlayAlbum = { album ->
-                playerConnection?.playAlbum(album.id, album.title)
-            },
+            onArtistClick = onNavigateToArtist,
+            onPlayAlbum = onPlayAlbum,
             isItemEnabled = isHomeItemEnabled,
-            onShowSurpriseMenu = { showSpeedDialSurpriseMenu = true },
-            currentSongId = remember(currentSong) { derivedStateOf { currentSong.value?.id } },
+            onShowSurpriseMenu = onShowSurpriseMenu,
+            currentSongId = currentSongId,
             isPlaying = isPlaying,
             isLandscape = isLandscape,
             speedDialSurpriseAtEndOfFirstPage = true,
             listState = listState,
-            contentPadding =
-                PaddingValues(
-                    top = topPadding,
-                    bottom = miniPlayerInset + 16.dp,
-                ),
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .onGloballyPositioned {
-                        startupPresentation?.homeLaidOut = true
-                    }.focusGroup()
-                    .focusRestorer(),
+            contentPadding = contentPadding,
+            modifier = homeModifier,
             header = {
                 if (isTv) {
-                    item(key = "tv_refresh") {
+                    item(key = "tv_refresh", contentType = "tv_refresh") {
                         Button(
                             onClick = {
                                 isRefreshing = true
@@ -314,19 +356,19 @@ fun HomeScreen(
                 }
                 when {
                     uiState.showLoadingPlaceholder -> {
-                        item(key = "home_loading") {
+                        item(key = "home_loading", contentType = "home_loading") {
                             HomeLoadingPlaceholder(isLandscape = isLandscape)
                         }
                     }
 
                     isOffline && uiState.hasNoHomeContent() -> {
-                        item(key = "home_offline") {
+                        item(key = "home_offline", contentType = "home_offline") {
                             Text(stringResource(Res.string.home_offline_empty), modifier = Modifier.padding(24.dp))
                         }
                     }
 
                     !isOffline && !uiState.error.isNullOrBlank() -> {
-                        item {
+                        item(key = "home_error", contentType = "home_error") {
                             Column(
                                 modifier = Modifier.padding(16.dp),
                             ) {
@@ -340,7 +382,7 @@ fun HomeScreen(
                     }
 
                     else -> {
-                        item {
+                        item(key = "home_chips", contentType = "home_chips") {
                             ChipShelf(
                                 options = uiState.chips,
                                 selectedOption = selectedChip,
@@ -349,7 +391,7 @@ fun HomeScreen(
                                 modifier = Modifier.padding(top = 1.dp),
                             )
                         }
-                        item(key = "wrapped_card") {
+                        item(key = "wrapped_card", contentType = "wrapped_card") {
                             WrappedHomeCard(
                                 onClick = onNavigateToWrapped,
                                 onDismissed = { Toast.makeText(context, it, Toast.LENGTH_LONG).show() },
@@ -392,44 +434,13 @@ fun HomeScreen(
         }
 
         if (!isTv) {
-            AnimatedVisibility(
-                visible = (LocalIsTv.current || showFloatingActions),
-                enter = fadeIn() + slideInVertically { it / 2 },
-                exit = fadeOut() + slideOutVertically { it / 2 },
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(
-                            bottom = floatingActionsBottomInset.value,
-                        ),
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    SmallFloatingActionButton(
-                        onClick = onNavigateToRecognition,
-                        shape = RoundedCornerShape(8.dp),
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ) {
-                        Icon(
-                            imageVector = MetrolistIcons.Outlined.AudioCapture,
-                            contentDescription = stringResource(Res.string.recognize_music),
-                        )
-                    }
-                    FloatingActionButton(
-                        onClick = ::shuffleHomeContent,
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        Icon(
-                            imageVector = MetrolistIcons.Rounded.Shuffle,
-                            contentDescription = stringResource(Res.string.shuffle),
-                        )
-                    }
-                }
-            }
+            HomeFloatingActions(
+                visibleState = showFloatingActions,
+                bottomInsetState = floatingActionsBottomInset,
+                onNavigateToRecognition = onNavigateToRecognition,
+                onShuffle = shuffleHomeContent,
+                modifier = Modifier.align(Alignment.BottomEnd),
+            )
         }
     }
 
@@ -449,6 +460,49 @@ fun HomeScreen(
             onDismiss = { showSpeedDialSurpriseMenu = false },
             onSetPinned = viewModel.shared::setSpeedDialSurprisePinned,
         )
+    }
+}
+
+@Composable
+private fun HomeFloatingActions(
+    visibleState: State<Boolean>,
+    bottomInsetState: State<Dp>,
+    onNavigateToRecognition: () -> Unit,
+    onShuffle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = LocalIsTv.current || visibleState.value,
+        enter = fadeIn() + slideInVertically { it / 2 },
+        exit = fadeOut() + slideOutVertically { it / 2 },
+        modifier = modifier.padding(bottom = bottomInsetState.value),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            SmallFloatingActionButton(
+                onClick = onNavigateToRecognition,
+                shape = RoundedCornerShape(8.dp),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ) {
+                Icon(
+                    imageVector = MetrolistIcons.Outlined.AudioCapture,
+                    contentDescription = stringResource(Res.string.recognize_music),
+                )
+            }
+            FloatingActionButton(
+                onClick = onShuffle,
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Icon(
+                    imageVector = MetrolistIcons.Rounded.Shuffle,
+                    contentDescription = stringResource(Res.string.shuffle),
+                )
+            }
+        }
     }
 }
 

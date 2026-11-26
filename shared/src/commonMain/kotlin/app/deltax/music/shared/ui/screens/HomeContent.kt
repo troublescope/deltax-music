@@ -2,15 +2,11 @@
 
 package app.deltax.music.shared.ui.screens
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -46,6 +42,7 @@ import androidx.compose.material3.carousel.CarouselItemDrawInfo
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -139,6 +136,7 @@ enum class HomeShelfHeaderAction {
     PLAY_ALL,
 }
 
+@Immutable
 data class HomeShelf(
     val key: String,
     val title: String,
@@ -164,6 +162,7 @@ data class HomeShelf(
     val excludedItemIds: Set<String> = emptySet(),
 )
 
+@Immutable
 data class HomeContentText(
     val moodsAndGenres: String,
     val speedDial: String,
@@ -365,29 +364,6 @@ private fun HomeRevalidationIndicator(
     }
 }
 
-@Composable
-private fun HomeShelfTransition(
-    shelf: HomeShelf,
-    content: @Composable (HomeShelf) -> Unit,
-) {
-    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    val sizeSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
-    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fastEffects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    AnimatedContent(
-        targetState = shelf,
-        contentKey = { current -> current.items.map(YTItem::id) },
-        transitionSpec = {
-            (fadeIn(effects) + scaleIn(spatial, initialScale = 0.96f))
-                .togetherWith(fadeOut(fastEffects))
-                .using(SizeTransform(clip = false) { _, _ -> sizeSpec })
-        },
-        label = "homeShelf",
-    ) { current ->
-        content(current)
-    }
-}
-
 fun LazyListScope.renderHomeShelves(
     shelves: List<HomeShelf>,
     shuffleLabel: String,
@@ -513,33 +489,31 @@ fun LazyListScope.renderHomeShelves(
                 contentAlignment = Alignment.TopCenter,
             ) {
                 Box(modifier = if (isWide) Modifier.widthIn(max = 1400.dp).fillMaxWidth() else Modifier.fillMaxWidth()) {
-                    HomeShelfTransition(shelf) { current ->
-                        DefaultHomeShelf(
-                            shelf = current,
-                            shuffleLabel = shuffleLabel,
-                            onItemClick = onItemClick,
-                            onVideoItemClick = onVideoItemClick,
-                            onSpeedDialItemClick = onSpeedDialItemClick,
-                            onItemLongClick = onItemLongClick,
-                            onShuffleSongs = onShuffleSongs,
-                            onPlaySongs = onPlaySongs,
-                            onLibraryClick = onLibraryClick,
-                            onLocalShelfClick = onLocalShelfClick,
-                            onSpeedDialItemLongClick = onSpeedDialItemLongClick,
-                            onSpeedDialItemSecondaryClick = onSpeedDialItemSecondaryClick,
-                            onArtistClick = onArtistClick,
-                            onAlbumClick = onAlbumClick,
-                            onPlayAlbum = onPlayAlbum,
-                            currentSongId = currentSongId,
-                            isPlaying = isPlaying,
-                            isItemEnabled = isItemEnabled,
-                            onShowSurpriseMenu = onShowSurpriseMenu,
-                            onShowSurpriseSecondaryMenu = onShowSurpriseSecondaryMenu,
-                            isLandscape = isLandscape,
-                            speedDialSurpriseAtEndOfFirstPage = speedDialSurpriseAtEndOfFirstPage,
-                            isWide = isWide,
-                        )
-                    }
+                    DefaultHomeShelf(
+                        shelf = shelf,
+                        shuffleLabel = shuffleLabel,
+                        onItemClick = onItemClick,
+                        onVideoItemClick = onVideoItemClick,
+                        onSpeedDialItemClick = onSpeedDialItemClick,
+                        onItemLongClick = onItemLongClick,
+                        onShuffleSongs = onShuffleSongs,
+                        onPlaySongs = onPlaySongs,
+                        onLibraryClick = onLibraryClick,
+                        onLocalShelfClick = onLocalShelfClick,
+                        onSpeedDialItemLongClick = onSpeedDialItemLongClick,
+                        onSpeedDialItemSecondaryClick = onSpeedDialItemSecondaryClick,
+                        onArtistClick = onArtistClick,
+                        onAlbumClick = onAlbumClick,
+                        onPlayAlbum = onPlayAlbum,
+                        currentSongId = currentSongId,
+                        isPlaying = isPlaying,
+                        isItemEnabled = isItemEnabled,
+                        onShowSurpriseMenu = onShowSurpriseMenu,
+                        onShowSurpriseSecondaryMenu = onShowSurpriseSecondaryMenu,
+                        isLandscape = isLandscape,
+                        speedDialSurpriseAtEndOfFirstPage = speedDialSurpriseAtEndOfFirstPage,
+                        isWide = isWide,
+                    )
                 }
             }
         }
@@ -687,7 +661,7 @@ private fun HomeShelfHeader(
     isWide: Boolean,
     onPlaySongs: ((List<SongItem>) -> Unit)?,
 ) {
-    val songs = shelf.items.filterIsInstance<SongItem>().filter(isItemEnabled)
+    val songs = remember(shelf.items, isItemEnabled) { shelf.items.filterIsInstance<SongItem>().filter(isItemEnabled) }
     val isLibraryAlbums = shelf.headerAction == HomeShelfHeaderAction.LIBRARY && shelf.browseId?.startsWith("FEmusic_library") == true
     SectionTitle(
         title = shelf.headerTitle ?: shelf.title,
@@ -1043,7 +1017,11 @@ private fun HomeGallery(
                 contentPadding = contentPadding,
                 modifier = galleryModifier.carouselScroll(state),
             ) {
-                items(pageCount, key = { page -> shelf.items[page * rows].homeKey(shelf.key, page * rows) }) { page ->
+                items(
+                    count = pageCount,
+                    key = { page -> shelf.items[page * rows].homeKey(shelf.key, page * rows) },
+                    contentType = { "home_gallery_page" },
+                ) { page ->
                     pageContent(page)
                 }
             }

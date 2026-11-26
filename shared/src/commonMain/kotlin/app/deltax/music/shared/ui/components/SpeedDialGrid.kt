@@ -127,6 +127,16 @@ import app.deltax.music.shared.viewmodels.shouldShowSpeedDialSurprise
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.floor
 
+private val SpeedDialScrimBrush =
+    Brush.verticalGradient(
+        colors =
+            listOf(
+                Color.Transparent,
+                Color.Transparent,
+                Color.Black.copy(alpha = 0.8f),
+            ),
+    )
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SpeedDialGrid(
@@ -150,7 +160,7 @@ fun SpeedDialGrid(
     isItemEnabled: (YTItem) -> Boolean = { true },
 ) {
     val haptics = rememberMetrolistHaptics()
-    val enabledItems = items.filter(isItemEnabled)
+    val enabledItems = remember(items, isItemEnabled) { items.filter(isItemEnabled) }
     val showSurprise =
         showSurprise && enabledItems.isNotEmpty() && shouldShowSpeedDialSurprise(items.size, surprisePinned)
     val contentCount = items.size + if (showSurprise) 1 else 0
@@ -430,8 +440,9 @@ fun SpeedDialGridItem(
                     onLongClick = onShowMenu,
                 ).onSecondaryClick(onShowSecondaryMenu ?: onShowMenu),
     ) {
+        val artworkModifier = if (artworkShape === shape) Modifier.fillMaxSize() else Modifier.fillMaxSize().clip(artworkShape)
         if (displayItem is PlaylistItem) {
-            PlaylistCoverImage(displayItem, Modifier.fillMaxSize().clip(artworkShape))
+            PlaylistCoverImage(displayItem, artworkModifier)
         } else if (displayItem.thumbnail.isAutoPlaylistIcon()) {
             AutoPlaylistThumbnail(displayItem.thumbnail, Modifier.fillMaxSize(), artworkShape)
         } else if (displayItem.thumbnail != null) {
@@ -439,7 +450,7 @@ fun SpeedDialGridItem(
                 url = displayItem.displayThumbnailUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().clip(artworkShape),
+                modifier = artworkModifier,
             )
         }
 
@@ -447,16 +458,7 @@ fun SpeedDialGridItem(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors =
-                                listOf(
-                                    Color.Transparent,
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.8f),
-                                ),
-                        ),
-                    ),
+                    .background(SpeedDialScrimBrush),
         )
 
         if (!Settings.shared.uiEnhancements && (item is SongItem || item is EpisodeItem)) {
