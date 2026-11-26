@@ -362,7 +362,7 @@ import app.deltax.music.ui.screens.settings.StatsScreen
 import app.deltax.music.ui.screens.settings.StorageSettingsScreen
 import app.deltax.music.ui.screens.settings.UpdateDetailsScreen
 import app.deltax.music.ui.screens.settings.UpdatesScreen
-import app.deltax.music.ui.theme.MetrolistTheme
+import app.deltax.music.ui.theme.DeltaXTheme
 import app.deltax.music.ui.utils.appBarScrollBehavior
 import app.deltax.music.ui.utils.resetHeightOffset
 import app.deltax.music.update.AppUpdateManager
@@ -403,7 +403,7 @@ private const val NAVIGATION_ROUTE_METADATA_KEY = "metrolist:route"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
-fun MetrolistApp(
+fun DeltaXApp(
     navigationSaveKey: String,
     incomingIntent: Intent? = null,
     incomingPlaybackSong: Deferred<SongItem>? = null,
@@ -464,7 +464,7 @@ fun MetrolistApp(
             .collectAsState()
             .value
             .takeIf { songArtworkColorsEnabled }
-    MetrolistTheme(
+    DeltaXTheme(
         darkTheme = darkTheme,
         dynamicColor = materialYouEnabled && hasDynamicColorSdk && artworkSeedColor == null,
         themeColor =
@@ -1437,7 +1437,7 @@ fun MetrolistApp(
                             LocalPlayerExpandedOrExpanding provides isPlayerExpandedOrExpanding,
                             LocalImmersiveContent provides immersiveContent,
                         ) {
-                            MetrolistNavigationScaffold(
+                            DeltaXNavigationScaffold(
                                 navigator = navigator,
                                 navigationState = navigationState,
                                 adaptiveLayout = adaptiveLayout,

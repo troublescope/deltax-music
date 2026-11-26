@@ -264,8 +264,8 @@ import app.deltax.music.shared.ui.settings.applyIosAppLanguage
 import app.deltax.music.shared.ui.settings.rememberIosAppIconActions
 import app.deltax.music.shared.ui.settings.rememberIosFontActions
 import app.deltax.music.shared.ui.settings.rememberIosLogExportAction
+import app.deltax.music.shared.ui.theme.DeltaXTheme
 import app.deltax.music.shared.ui.theme.MdSpacing
-import app.deltax.music.shared.ui.theme.MetrolistTheme
 import app.deltax.music.shared.ui.theme.rememberArtworkSeedColor
 import app.deltax.music.shared.ui.theme.resolveThemeSeedColor
 import app.deltax.music.shared.ui.utils.rememberFileSizeFormatter
@@ -803,7 +803,7 @@ fun MobileApp(
                 ?.thumbnail
                 ?.takeIf { Settings.shared.materialYouEnabled && Settings.shared.dynamicTheme },
         )
-    MetrolistTheme(
+    DeltaXTheme(
         seedColor =
             resolveThemeSeedColor(
                 materialYouEnabled = Settings.shared.materialYouEnabled,

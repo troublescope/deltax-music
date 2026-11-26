@@ -107,7 +107,7 @@ val Screen.iconFilled: ImageVector?
         }
 
 @Composable
-fun MetrolistNavigationScaffold(
+fun DeltaXNavigationScaffold(
     navigator: Navigator,
     navigationState: NavigationState,
     adaptiveLayout: AdaptiveLayout,

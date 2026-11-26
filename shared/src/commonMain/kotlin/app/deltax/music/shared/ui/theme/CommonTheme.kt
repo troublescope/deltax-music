@@ -81,7 +81,7 @@ fun resolveThemeSeedColor(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun MetrolistTheme(
+fun DeltaXTheme(
     seedColor: Color = DefaultThemeColor,
     darkTheme: Boolean = false,
     pureBlack: Boolean = false,

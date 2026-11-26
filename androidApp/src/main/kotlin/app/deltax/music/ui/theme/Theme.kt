@@ -54,7 +54,7 @@ import timber.log.Timber
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun MetrolistTheme(
+fun DeltaXTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     pureBlack: Boolean = false,
     themeColor: Color = DefaultThemeColor,

@@ -41,7 +41,7 @@ private val DarkColors =
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun MetrolistTheme(
+fun DeltaXTheme(
     useDarkTheme: Boolean = false,
     content: @Composable () -> Unit,
 ) {

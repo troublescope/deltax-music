@@ -69,10 +69,10 @@ import app.deltax.music.shared.ui.theme.appearanceDensity
 import app.deltax.music.shared.youtube.playback.AndroidTokenProvider
 import app.deltax.music.shared.youtube.playback.PlaybackNetworkStateStore
 import app.deltax.music.shared.youtube.playback.StreamResolver
+import app.deltax.music.ui.DeltaXApp
 import app.deltax.music.ui.IncomingDestination
-import app.deltax.music.ui.MetrolistApp
 import app.deltax.music.ui.screens.settings.DiscordLoginFlow
-import app.deltax.music.ui.theme.MetrolistTheme
+import app.deltax.music.ui.theme.DeltaXTheme
 import app.deltax.music.ui.toIncomingDestination
 import app.deltax.music.utils.CrashHandler
 import app.deltax.music.utils.isAndroidTv
@@ -310,7 +310,7 @@ class MainActivity : ComponentActivity() {
                 var onboardingComplete by remember { mutableStateOf(app.onboardingManager.isComplete) }
                 Box(Modifier.fillMaxSize().onGloballyPositioned { startupPresentation.contentLaidOut = true }) {
                     if (onboardingComplete) {
-                        MetrolistApp(
+                        DeltaXApp(
                             navigationSaveKey = navigationRestoration.saveKey,
                             incomingIntent = incomingIntentState.value,
                             incomingPlaybackSong = incomingPlaybackSong,
@@ -325,7 +325,7 @@ class MainActivity : ComponentActivity() {
                     } else {
                         val tvDevice = remember { isAndroidTv() }
                         CompositionLocalProvider(LocalIsTv provides tvDevice) {
-                            MetrolistTheme {
+                            DeltaXTheme {
                                 OnboardingScreen(
                                     migration = app.legacyInstallMigration,
                                     hasLegacyInstallationOverride = app.hadLegacyInstallationAtStartup,
