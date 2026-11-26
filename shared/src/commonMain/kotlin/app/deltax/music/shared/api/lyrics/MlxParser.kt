@@ -155,9 +155,7 @@ object MlxParser {
                 linesWithSongParts
             }
         val song = parseSong(sections["song"] ?: emptyList())
-        val translationMatches =
-            song.translationLanguage?.let { lyricsTranslationLanguageMatches(it, lyricsTranslationTargetLanguage()) } != false
-        val translatedSection = (sections["translatedlyrics"] ?: sections["translated_lyrics"]).takeIf { translationMatches }
+        val translatedSection = sections["translatedlyrics"] ?: sections["translated_lyrics"]
         val finalLines =
             if (!translatedSection.isNullOrEmpty()) {
                 val matches = matchAuxiliaryLyrics(romanizedLines, parseLyricsSection(translatedSection, agents))

@@ -1094,7 +1094,7 @@ internal fun InlineLyricsLine(
             val showRomanBg = !romanizeAsMainSetting && roman != null && romanBgText.isNotBlank()
 
             val mainContent: @Composable () -> Unit = {
-                Box(Modifier.lyricsTranslationShimmer(translationShimmer, colorScheme.primary)) {
+                Box {
                     if (isWordAnimEnabled && !mainWords.isNullOrEmpty()) {
                         WordLevelLyrics(
                             mainText = mainText,
@@ -1170,7 +1170,7 @@ internal fun InlineLyricsLine(
                                     },
                         ) {
                             if (hasBg && bgText.isNotBlank()) {
-                                Box(Modifier.lyricsTranslationShimmer(backgroundTranslationShimmer, colorScheme.primary)) {
+                                Box {
                                     if (isWordAnimEnabled && !bgWords.isNullOrEmpty()) {
                                         WordLevelLyrics(
                                             mainText = bgText,

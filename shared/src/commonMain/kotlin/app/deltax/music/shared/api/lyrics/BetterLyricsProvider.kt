@@ -110,13 +110,7 @@ internal fun parseTtmlToMlx(
     configuredTranslationLanguage: String? = null,
 ): String {
     if (!isTtmlWithinLimits(ttml)) return ""
-    // Read the setting only for documents with translations; parsing must not depend on platform storage otherwise.
-    val translationLanguage =
-        if (ttml.contains("translation")) {
-            configuredTranslationLanguage ?: lyricsTranslationTargetLanguage()
-        } else {
-            ""
-        }
+    val translationLanguage = configuredTranslationLanguage.orEmpty()
     val lines = mutableListOf<TtmlLine>()
     val agentTypes = mutableMapOf<String, String>()
 
@@ -655,7 +649,9 @@ private fun inlineTranslation(
 ): String? =
     element.children
         .firstOrNull {
-            getAttr(it, "role") == "x-translation" && lyricsTranslationLanguageMatches(it.getAttribute("xml:lang"), targetLanguage)
+            getAttr(it, "role") == "x-translation" &&
+                targetLanguage.isNotBlank() &&
+                it.getAttribute("xml:lang").equals(targetLanguage, ignoreCase = true)
         }?.textContent
         ?.trim()
         ?.takeIf { it.isNotEmpty() }
@@ -667,7 +663,10 @@ private fun parseTranslations(
     val translations = mutableMapOf<String, String>()
 
     fun collect(element: XmlElement) {
-        if (element.localName == "translation" && lyricsTranslationLanguageMatches(element.getAttribute("xml:lang"), targetLanguage)) {
+        if (element.localName == "translation" &&
+            targetLanguage.isNotBlank() &&
+            element.getAttribute("xml:lang").equals(targetLanguage, ignoreCase = true)
+        ) {
             element.children.filter { it.localName == "text" }.forEach { text ->
                 val key = getAttr(text, "for")
                 val value = text.textContent.trim()

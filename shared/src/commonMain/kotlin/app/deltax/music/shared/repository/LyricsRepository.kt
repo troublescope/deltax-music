@@ -256,6 +256,7 @@ class LyricsRepository(
     private val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     private val prepareDictionaries: suspend (String, Set<String>) -> Boolean = ::prepareRomanizationDictionaries,
     private val providerResultsDispatcher: CoroutineDispatcher? = Dispatchers.Default,
+    private val isOnline: () -> Boolean = { PlaybackNetworkStateStore.current.connected },
 ) {
     private val songwritersCacheGuard = Mutex()
     private val songwritersCache = linkedMapOf<String, List<String>>()
