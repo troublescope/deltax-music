@@ -72,10 +72,15 @@ data class GitHubRelease(
                         BLOCKED_APK_MARKERS.none { marker -> asset.name.contains(marker, ignoreCase = true) }
                 }
             val preferredNames =
-                PREFERRED_APK_NAMES + listOf("metrolist-android-$version.apk", "metrolist-android-$version-universal.apk")
+                PREFERRED_APK_NAMES +
+                    listOf(
+                        "deltax-music-android-$version.apk",
+                        "deltax-music-android-$version-universal.apk",
+                        "deltax-music-$version.apk",
+                    )
             return preferredNames.firstNotNullOfOrNull { preferred ->
                 candidates.singleOrNull { it.name.equals(preferred, ignoreCase = true) }
-            }
+            } ?: candidates.singleOrNull()
         }
 }
 
@@ -123,8 +128,8 @@ enum class UpdateFailure { CHECK, NO_APK, DOWNLOAD, DIGEST, INSTALL }
 
 object AppUpdateManager {
     const val CHANNEL_ID = "updates"
-    private const val RELEASES_URL = "https://api.github.com/repos/MetrolistGroup/Metrolist/releases?per_page=50"
-    private const val NIGHTLY_RELEASE_URL = "https://api.github.com/repos/MetrolistGroup/Metrolist/releases/tags/$NIGHTLY_TAG"
+    private const val RELEASES_URL = "https://api.github.com/repos/troublescope/deltax-music/releases?per_page=50"
+    private const val NIGHTLY_RELEASE_URL = "https://api.github.com/repos/troublescope/deltax-music/releases/tags/$NIGHTLY_TAG"
     private const val NOTIFICATION_ID = 1400
     private const val MAX_APK_BYTES = 512L * 1024 * 1024
     private const val MIN_FREE_SPACE_BYTES = 16L * 1024 * 1024
@@ -226,7 +231,7 @@ object AppUpdateManager {
                             .url(RELEASES_URL)
                             .header("Accept", "application/vnd.github+json")
                             .header("X-GitHub-Api-Version", "2022-11-28")
-                            .header("User-Agent", "Metrolist/${BuildConfig.VERSION_NAME}")
+                            .header("User-Agent", "DeltaX-Music/${BuildConfig.VERSION_NAME}")
                             .build()
                     val allReleases =
                         client.newCall(request).execute().use { response ->
@@ -284,7 +289,7 @@ object AppUpdateManager {
                 .url(NIGHTLY_RELEASE_URL)
                 .header("Accept", "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")
-                .header("User-Agent", "Metrolist/${BuildConfig.VERSION_NAME}")
+                .header("User-Agent", "DeltaX-Music/${BuildConfig.VERSION_NAME}")
                 .build()
         return client
             .newCall(request)
@@ -319,13 +324,13 @@ object AppUpdateManager {
                 check(asset.size in 1..MAX_APK_BYTES) { "Invalid update size" }
                 val updateDir = File(context.cacheDir, "updates").apply { mkdirs() }
                 updateDir.listFiles()?.forEach(File::delete)
-                val partial = File(updateDir, "Metrolist-${release.version}.apk.part")
-                val output = File(updateDir, "Metrolist-${release.version}.apk")
+                val partial = File(updateDir, "DeltaX-Music-${release.version}.apk.part")
+                val output = File(updateDir, "DeltaX-Music-${release.version}.apk")
                 val request =
                     Request
                         .Builder()
                         .url(asset.downloadUrl)
-                        .header("User-Agent", "Metrolist/${BuildConfig.VERSION_NAME}")
+                        .header("User-Agent", "DeltaX-Music/${BuildConfig.VERSION_NAME}")
                         .build()
                 var downloaded = 0L
                 val call = client.newCall(request).also { activeDownload = it }
@@ -406,7 +411,7 @@ object AppUpdateManager {
         return if (crashRecovery && method == UpdateInstallMethod.SHIZUKU) UpdateInstallMethod.SYSTEM else method
     }
 
-    /** Switches the install method after the user grants root or Shizuku access, then claims Metrolist as its own installer. */
+    /** Switches the install method after the user grants root or Shizuku access, then claims DeltaX Music as its own installer. */
     suspend fun selectInstallMethod(
         context: Context,
         method: UpdateInstallMethod,
@@ -420,7 +425,7 @@ object AppUpdateManager {
         return access
     }
 
-    /** True when an update can install with no prompt: through root or Shizuku, or on Android 12+ when Metrolist may install apps and owns its updates. */
+    /** True when an update can install with no prompt: through root or Shizuku, or on Android 12+ when DeltaX Music may install apps and owns its updates. */
     fun canInstallWithoutPrompt(context: Context): Boolean =
         when (installMethod()) {
             UpdateInstallMethod.ROOT -> {
@@ -710,12 +715,14 @@ object AppUpdateManager {
 }
 
 private const val CHECK_INTERVAL_MILLIS = 60 * 60 * 1_000L
-private const val CACHE_SOURCE = "github-releases-metrolist-v1"
+private const val CACHE_SOURCE = "github-releases-deltax-music-v1"
 private val PREFERRED_APK_NAMES =
     listOf(
-        "Metrolist.apk",
-        "Metrolist-Android-release.apk",
+        "DeltaXMusic.apk",
+        "DeltaX-Music.apk",
+        "DeltaX-Music-Android-release.apk",
+        "deltax-music-release.apk",
         "androidApp-release.apk",
-        "nightly-Metrolist-Android-release.apk",
+        "nightly-DeltaX-Music-Android-release.apk",
     )
 private val BLOCKED_APK_MARKERS = listOf("debug", "unsigned", "unaligned", "test", "benchmark")

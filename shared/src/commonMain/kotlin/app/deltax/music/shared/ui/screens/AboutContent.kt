@@ -137,16 +137,22 @@ data class AboutContributor(
 object AboutContributors {
     val lead: AboutContributor =
         AboutContributor(
-            name = "Mo Agamy",
+            name = "Troublescope",
             role = AboutContributorRole.CREATOR,
-            githubHandle = "mostafaalagamy",
-            sponsorUrl = "https://buymeacoffee.com/mostafaalagamy",
+            githubHandle = "troublescope",
             avatarShape = AboutAvatarShape.COOKIE_9_SIDED,
-            favoriteSongVideoId = "Mh2JWGWvy_Y",
         )
 
     val leads: List<AboutContributor> =
         listOf(
+            AboutContributor(
+                name = "Mo Agamy",
+                role = AboutContributorRole.ANDROID_LEAD,
+                githubHandle = "mostafaalagamy",
+                sponsorUrl = "https://buymeacoffee.com/mostafaalagamy",
+                avatarShape = AboutAvatarShape.COOKIE_9_SIDED,
+                favoriteSongVideoId = "Mh2JWGWvy_Y",
+            ),
             AboutContributor(
                 name = "Nyx",
                 role = AboutContributorRole.ANDROID_LEAD,
@@ -243,13 +249,11 @@ data class AboutCommunityLink(
 
 val aboutCommunityLinks: List<AboutCommunityLink> =
     listOf(
-        AboutCommunityLink(AboutCommunityLinkKind.DISCORD, "https://discord.com/invite/zrdbeRG2Mt"),
-        AboutCommunityLink(AboutCommunityLinkKind.TELEGRAM, "https://t.me/metrolistapp"),
-        AboutCommunityLink(AboutCommunityLinkKind.REPOSITORY, "https://github.com/MetrolistGroup/Metrolist"),
+        AboutCommunityLink(AboutCommunityLinkKind.REPOSITORY, "https://github.com/troublescope/deltax-music"),
     )
 
 val aboutLicenseLink: AboutCommunityLink =
-    AboutCommunityLink(AboutCommunityLinkKind.LICENSE, "https://github.com/MetrolistGroup/Metrolist/blob/main/LICENSE")
+    AboutCommunityLink(AboutCommunityLinkKind.LICENSE, "https://github.com/troublescope/deltax-music/blob/main/LICENSE")
 
 data class AboutScreenText(
     val title: String,

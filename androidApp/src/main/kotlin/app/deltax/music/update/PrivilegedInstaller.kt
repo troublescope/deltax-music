@@ -72,7 +72,7 @@ internal object PrivilegedInstaller {
             }
         }
 
-    /** Records Metrolist as the installer of its own package, which lets Android 12+ update it without a prompt. */
+    /** Records DeltaX Music as the installer of its own package, which lets Android 12+ update it without a prompt. */
     fun claimInstaller(
         method: UpdateInstallMethod,
         packageName: String,

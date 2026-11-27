@@ -143,8 +143,6 @@ fun rememberMetrolistSettingsRegistry(
                             Res.string.credits_creator_section,
                             Res.string.credits_collaborators_section,
                             Res.string.brand_github,
-                            Res.string.brand_discord,
-                            Res.string.brand_telegram,
                             Res.string.credits_license_name,
                             Res.string.sponsor_developer,
                             Res.string.open_website,
